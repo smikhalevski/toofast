@@ -6,6 +6,8 @@ The Node.js performance testing tool.
 npm install --save-dev @smikhalevski/perf-test
 ```
 
+⚠️ [API documentation is available here.](https://smikhalevski.github.io/perf-test/)
+
 ## Usage
 
 Measure performance of a callback:

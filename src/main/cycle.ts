@@ -22,21 +22,21 @@ export interface ICycleOptions {
    *
    * @default 0.005
    */
-  marginOfError?: number;
+  targetRme?: number;
 
   /**
    * The callback executed before each callback invocation.
    *
    * @param histogram The histogram that describes the current results.
    */
-  beforeCycle?: (histogram: IHistogram) => void;
+  beforeCycle?: (cycleCount: number, histogram: IHistogram) => void;
 
   /**
    * The callback executed after each callback invocation.
    *
    * @param histogram The histogram that describes the current results.
    */
-  afterCycle?: (histogram: IHistogram) => boolean | void;
+  afterCycle?: (cycleCount: number, histogram: IHistogram) => boolean | void;
 }
 
 /**
@@ -50,23 +50,23 @@ export function cycle(callback: () => void, histogram: IHistogram, options: ICyc
   const {
     warmupCycleCount = 1,
     timeout = 3000,
-    marginOfError = 0.005,
+    targetRme = 0.005,
     beforeCycle,
     afterCycle,
   } = options;
 
   for (let i = 0; i < warmupCycleCount; ++i) {
-    beforeCycle?.(histogram);
+    beforeCycle?.(i, histogram);
     callback();
-    afterCycle?.(histogram);
+    afterCycle?.(i, histogram);
   }
 
   const startTimestamp = performance.now();
 
   let endTimestamp = startTimestamp;
 
-  do {
-    beforeCycle?.(histogram);
+  for (let i = 0; endTimestamp - startTimestamp < timeout; ++i) {
+    beforeCycle?.(i, histogram);
 
     const runTimestamp = performance.now();
     callback();
@@ -74,8 +74,8 @@ export function cycle(callback: () => void, histogram: IHistogram, options: ICyc
 
     histogram.add(endTimestamp - runTimestamp);
 
-    if (afterCycle?.(histogram) === false || histogram.getRme() <= marginOfError) {
+    if (afterCycle?.(i, histogram) === false || i > 2 && histogram.getRme() <= targetRme) {
       break;
     }
-  } while (endTimestamp - startTimestamp < timeout);
+  }
 }
