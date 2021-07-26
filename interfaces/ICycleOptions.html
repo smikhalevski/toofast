@@ -3,8 +3,8 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>ICycleOptions | perf-test</title>
-	<meta name="description" content="Documentation for perf-test">
+	<title>ICycleOptions | @smikhalevski/perf-test</title>
+	<meta name="description" content="Documentation for @smikhalevski/perf-test">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
 	<script async src="../assets/js/search.js" id="search-script"></script>
@@ -23,7 +23,7 @@
 						<li class="state loading">Preparing search index...</li>
 						<li class="state failure">The search index is not available</li>
 					</ul>
-					<a href="../index.html" class="title">perf-test</a>
+					<a href="../index.html" class="title">@smikhalevski/perf-test</a>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -52,7 +52,7 @@
 		<div class="container">
 			<ul class="tsd-breadcrumb">
 				<li>
-					<a href="../modules.html">perf-test</a>
+					<a href="../modules.html">@smikhalevski/perf-test</a>
 				</li>
 				<li>
 					<a href="ICycleOptions.html">ICycleOptions</a>
@@ -80,7 +80,7 @@
 						<section class="tsd-index-section ">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="ICycleOptions.html#marginOfError" class="tsd-kind-icon">margin<wbr>OfError</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="ICycleOptions.html#targetRme" class="tsd-kind-icon">target<wbr>Rme</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="ICycleOptions.html#timeout" class="tsd-kind-icon">timeout</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="ICycleOptions.html#warmupCycleCount" class="tsd-kind-icon">warmup<wbr>Cycle<wbr>Count</a></li>
 							</ul>
@@ -98,12 +98,12 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="marginOfError" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> margin<wbr>OfError</h3>
-					<div class="tsd-signature tsd-kind-icon">margin<wbr>OfError<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+					<a name="targetRme" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> target<wbr>Rme</h3>
+					<div class="tsd-signature tsd-kind-icon">target<wbr>Rme<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/d47d500/src/main/cycle.ts#L25">cycle.ts:25</a></li>
+							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/85130b0/src/main/cycle.ts#L25">cycle.ts:25</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -123,7 +123,7 @@
 					<div class="tsd-signature tsd-kind-icon">timeout<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/d47d500/src/main/cycle.ts#L18">cycle.ts:18</a></li>
+							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/85130b0/src/main/cycle.ts#L18">cycle.ts:18</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -143,7 +143,7 @@
 					<div class="tsd-signature tsd-kind-icon">warmup<wbr>Cycle<wbr>Count<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/d47d500/src/main/cycle.ts#L11">cycle.ts:11</a></li>
+							<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/85130b0/src/main/cycle.ts#L11">cycle.ts:11</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -164,13 +164,13 @@
 					<a name="afterCycle" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> after<wbr>Cycle</h3>
 					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-interface">
-						<li class="tsd-signature tsd-kind-icon">after<wbr>Cycle<span class="tsd-signature-symbol">(</span>histogram<span class="tsd-signature-symbol">: </span><a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">void</span></li>
+						<li class="tsd-signature tsd-kind-icon">after<wbr>Cycle<span class="tsd-signature-symbol">(</span>cycleCount<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span>, histogram<span class="tsd-signature-symbol">: </span><a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">void</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/d47d500/src/main/cycle.ts#L39">cycle.ts:39</a></li>
+									<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/85130b0/src/main/cycle.ts#L39">cycle.ts:39</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -180,6 +180,9 @@
 							</div>
 							<h4 class="tsd-parameters-title">Parameters</h4>
 							<ul class="tsd-parameters">
+								<li>
+									<h5>cycleCount: <span class="tsd-signature-type">number</span></h5>
+								</li>
 								<li>
 									<h5>histogram: <a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a></h5>
 									<div class="tsd-comment tsd-typography">
@@ -195,13 +198,13 @@
 					<a name="beforeCycle" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> before<wbr>Cycle</h3>
 					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-interface">
-						<li class="tsd-signature tsd-kind-icon">before<wbr>Cycle<span class="tsd-signature-symbol">(</span>histogram<span class="tsd-signature-symbol">: </span><a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+						<li class="tsd-signature tsd-kind-icon">before<wbr>Cycle<span class="tsd-signature-symbol">(</span>cycleCount<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span>, histogram<span class="tsd-signature-symbol">: </span><a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/d47d500/src/main/cycle.ts#L32">cycle.ts:32</a></li>
+									<li>Defined in <a href="https://github.com/smikhalevski/perf-test/blob/85130b0/src/main/cycle.ts#L32">cycle.ts:32</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -211,6 +214,9 @@
 							</div>
 							<h4 class="tsd-parameters-title">Parameters</h4>
 							<ul class="tsd-parameters">
+								<li>
+									<h5>cycleCount: <span class="tsd-signature-type">number</span></h5>
+								</li>
 								<li>
 									<h5>histogram: <a href="IHistogram.html" class="tsd-signature-type" data-tsd-kind="Interface">IHistogram</a></h5>
 									<div class="tsd-comment tsd-typography">
@@ -243,7 +249,7 @@
 						<a href="ICycleOptions.html" class="tsd-kind-icon">ICycle<wbr>Options</a>
 						<ul>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="ICycleOptions.html#marginOfError" class="tsd-kind-icon">margin<wbr>OfError</a>
+								<a href="ICycleOptions.html#targetRme" class="tsd-kind-icon">target<wbr>Rme</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
 								<a href="ICycleOptions.html#timeout" class="tsd-kind-icon">timeout</a>
