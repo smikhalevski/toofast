@@ -61,18 +61,12 @@ export function cycle(callback: () => void, histogram: IHistogram, options: ICyc
     afterCycle?.(i, histogram);
   }
 
-  const startTimestamp = performance.now();
-
-  let endTimestamp = startTimestamp;
-
-  for (let i = 0; endTimestamp - startTimestamp < timeout; ++i) {
+  for (let i = 0; histogram.getResult() < timeout; ++i) {
     beforeCycle?.(i, histogram);
 
-    const runTimestamp = performance.now();
+    const timestamp = performance.now();
     callback();
-    endTimestamp = performance.now();
-
-    histogram.add(endTimestamp - runTimestamp);
+    histogram.add(performance.now() - timestamp);
 
     if (afterCycle?.(i, histogram) === false || i > 2 && histogram.getRme() <= targetRme) {
       break;

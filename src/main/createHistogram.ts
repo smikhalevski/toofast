@@ -22,6 +22,8 @@ export interface IHistogram {
    */
   getSize(): number;
 
+  getResult(): number;
+
   /**
    * The mean value.
    */
@@ -108,6 +110,7 @@ export function createHistogram(): IHistogram {
 
   return {
     getSize,
+    getResult: xAdder.getResult,
     getMean,
     getHz,
     getVariance,
