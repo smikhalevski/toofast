@@ -6,7 +6,7 @@ export interface IAdder {
   /**
    * The total sum of added measurements.
    */
-  getResult(): number;
+  getSum(): number;
 
   /**
    * Add a new measurement.
@@ -27,7 +27,7 @@ export function createAdder(): IAdder {
   let result = 0;
   let c = 0;
 
-  const getResult = () => result + c;
+  const getSum = () => result + c;
 
   const add = (x: number): void => {
     const t = result + x;
@@ -36,7 +36,7 @@ export function createAdder(): IAdder {
   };
 
   return {
-    getResult,
+    getSum,
     add,
   };
 }

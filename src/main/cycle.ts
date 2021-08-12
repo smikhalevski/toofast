@@ -1,21 +1,45 @@
 import {performance} from 'perf_hooks';
 import {IHistogram} from './createHistogram';
 
+/**
+ * The mode of duration calculation.
+ */
+export const enum DurationMode {
+
+  /**
+   * Measure cycle duration as time spent on callback invocation, {@link ICycleOptions.beforeIteration} and
+   * {@link ICycleOptions.afterIteration}.
+   */
+  ABSOLUTE = 0,
+
+  /**
+   * Measure cycle duration as time spent on callback invocation exclusively.
+   */
+  EFFECTIVE = 1,
+}
+
 export interface ICycleOptions {
 
   /**
-   * The number of execution before results are collected.
+   * The number of iterations before results are collected.
    *
-   * @default 1
+   * @default 0
    */
-  warmupCycleCount?: number;
+  warmupIterationCount?: number;
 
   /**
-   * The timeout of the cycle.
+   * The timeout in milliseconds.
    *
    * @default 3000
    */
   timeout?: number;
+
+  /**
+   * The mode of cycle duration calculation.
+   *
+   * @default `DurationMode.EFFECTIVE`
+   */
+  durationMode?: DurationMode;
 
   /**
    * The required margin of error to abort the cycle.
@@ -25,18 +49,21 @@ export interface ICycleOptions {
   targetRme?: number;
 
   /**
-   * The callback executed before each callback invocation.
+   * The callback executed before each iteration.
    *
+   * @param iterationIndex The number of the current iteration.
    * @param histogram The histogram that describes the current results.
    */
-  beforeCycle?: (cycleCount: number, histogram: IHistogram) => void;
+  beforeIteration?(iterationIndex: number, histogram: IHistogram): void;
 
   /**
-   * The callback executed after each callback invocation.
+   * The callback executed after each iteration.
    *
+   * @param iterationIndex The number of the current iteration.
    * @param histogram The histogram that describes the current results.
+   * @returns If `false` is returned then cycle is aborted.
    */
-  afterCycle?: (cycleCount: number, histogram: IHistogram) => boolean | void;
+  afterIteration?(iterationIndex: number, histogram: IHistogram): boolean | void;
 }
 
 /**
@@ -48,28 +75,38 @@ export interface ICycleOptions {
  */
 export function cycle(callback: () => void, histogram: IHistogram, options: ICycleOptions = {}): void {
   const {
-    warmupCycleCount = 1,
+    warmupIterationCount = 1,
     timeout = 3000,
+    durationMode = DurationMode.EFFECTIVE,
     targetRme = 0.005,
-    beforeCycle,
-    afterCycle,
+    beforeIteration,
+    afterIteration,
   } = options;
 
-  for (let i = 0; i < warmupCycleCount; ++i) {
-    beforeCycle?.(i, histogram);
+  let i = 0;
+
+  while (i < warmupIterationCount) {
+    beforeIteration?.(i, histogram);
     callback();
-    afterCycle?.(i, histogram);
+    afterIteration?.(i, histogram);
+    ++i;
   }
 
-  for (let i = 0; histogram.getResult() < timeout; ++i) {
-    beforeCycle?.(i, histogram);
+  const cycleTimestamp = performance.now();
 
-    const timestamp = performance.now();
+  while (true) {
+    beforeIteration?.(i, histogram);
+
+    const iterationTimestamp = performance.now();
     callback();
-    histogram.add(performance.now() - timestamp);
+    histogram.add(performance.now() - iterationTimestamp);
 
-    if (afterCycle?.(i, histogram) === false || i > 2 && histogram.getRme() <= targetRme) {
+    const aborted = afterIteration?.(i, histogram) === false;
+    const duration = durationMode === DurationMode.EFFECTIVE ? histogram.getSum() : performance.now() - cycleTimestamp;
+
+    if (aborted || duration > timeout || i > 2 && histogram.getRme() <= targetRme) {
       break;
     }
+    ++i;
   }
 }

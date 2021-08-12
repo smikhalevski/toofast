@@ -22,7 +22,7 @@ export interface IHistogram {
    */
   getSize(): number;
 
-  getResult(): number;
+  getSum(): number;
 
   /**
    * The mean value.
@@ -87,12 +87,12 @@ export function createHistogram(): IHistogram {
 
   const getSize = () => size;
 
-  const getMean = () => size === 0 ? 0 : xAdder.getResult() / size;
+  const getMean = () => size === 0 ? 0 : xAdder.getSum() / size;
 
   const getHz = () => 1000 / getMean();
 
   // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
-  const getVariance = () => size === 0 ? 0 : (sqxAdder.getResult() - (xAdder.getResult() * xAdder.getResult()) / size) / size;
+  const getVariance = () => size === 0 ? 0 : (sqxAdder.getSum() - (xAdder.getSum() * xAdder.getSum()) / size) / size;
 
   const getSd = () => Math.sqrt(getVariance());
 
@@ -110,7 +110,7 @@ export function createHistogram(): IHistogram {
 
   return {
     getSize,
-    getResult: xAdder.getResult,
+    getSum: xAdder.getSum,
     getMean,
     getHz,
     getVariance,
