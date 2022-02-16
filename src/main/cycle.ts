@@ -1,6 +1,6 @@
 import {performance} from 'perf_hooks';
-import {IHistogram} from './createHistogram';
 import {sleep} from 'parallel-universe';
+import {Histogram} from './Histogram';
 
 /**
  * The mode of duration calculation.
@@ -59,7 +59,7 @@ export interface ICycleOptions {
    * @param iterationIndex The number of the current iteration.
    * @param histogram The histogram that describes the current results.
    */
-  beforeIteration?(iterationIndex: number, histogram: IHistogram): void;
+  beforeIteration?(iterationIndex: number, histogram: Histogram): void;
 
   /**
    * The callback executed after each iteration.
@@ -68,7 +68,7 @@ export interface ICycleOptions {
    * @param histogram The histogram that describes the current results.
    * @returns If `false` is returned then cycle is aborted.
    */
-  afterIteration?(iterationIndex: number, histogram: IHistogram): boolean | void;
+  afterIteration?(iterationIndex: number, histogram: Histogram): boolean | void;
 }
 
 /**
@@ -78,7 +78,7 @@ export interface ICycleOptions {
  * @param histogram The histogram to populate.
  * @param options The cycle options.
  */
-export function cycle(cb: () => void, histogram: IHistogram, options: ICycleOptions = {}): Promise<void> {
+export function cycle(cb: () => void, histogram: Histogram, options: ICycleOptions = {}): Promise<void> {
   const {
     warmupIterationCount = 1,
     batchTimeout = 1000,
@@ -107,6 +107,7 @@ export function cycle(cb: () => void, histogram: IHistogram, options: ICycleOpti
 
   const nextBatch = (resolve: () => void) => {
     const batchTs = Date.now();
+
     while (true) {
       beforeIteration?.(i, histogram);
 
@@ -115,17 +116,20 @@ export function cycle(cb: () => void, histogram: IHistogram, options: ICycleOpti
       histogram.add(performance.now() - iterationTs);
 
       const aborted = afterIteration?.(i, histogram) === false;
-      const cycleDuration = durationMode === DurationMode.EXCLUSIVE ? histogram.getSum() : Date.now() - cycleTs;
+      const cycleDuration = durationMode === DurationMode.EXCLUSIVE ? histogram.sum : Date.now() - cycleTs;
 
-      if (aborted || cycleDuration > cycleTimeout || i > 2 && histogram.getRme() <= targetRme) {
+      if (aborted || cycleDuration > cycleTimeout || i > 2 && histogram.rme <= targetRme) {
         resolve();
         break;
       }
+
       const batchDuration = Date.now() - batchTs;
+
       if (batchDuration > batchTimeout) {
         sleep(1000).then(() => nextBatch(resolve));
         return;
       }
+
       ++i;
     }
   };

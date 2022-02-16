@@ -1,7 +1,7 @@
-import {IHistogram} from './createHistogram';
+import {Histogram} from './Histogram';
 
-export function formatHistogram(histogram: IHistogram): string {
-  return `${formatNumber(histogram.getHz())} ops/sec ± ${formatNumber(histogram.getRme() * 100)}%`;
+export function formatHistogram(histogram: Histogram): string {
+  return `${formatNumber(histogram.hz)} ops/sec ± ${formatNumber(histogram.rme * 100)}%`;
 }
 
 const reThousands = /(?=(?:\d{3})+$)(?!\b)/g;

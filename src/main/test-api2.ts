@@ -1,5 +1,5 @@
 import {cycle, ICycleOptions} from './cycle';
-import {createHistogram} from './createHistogram';
+import {Histogram} from './Histogram';
 
 let promise = Promise.resolve();
 
@@ -12,11 +12,11 @@ export function describe(label: string, cb: () => void) {
 
 export function test(label: string, cb: () => void, options?: ICycleOptions): void {
   promise = promise.then(() => {
-    const histogram = createHistogram();
+    const histogram = new Histogram();
 
     console.log(label);
     return cycle(cb, histogram, options).then(() => {
-      console.log(histogram.getHz() + 'ops/sec');
+      console.log(histogram.hz + 'ops/sec');
     });
   });
 }

@@ -1,12 +1,12 @@
 import {cycle, ICycleOptions} from './cycle';
-import {createHistogram} from './createHistogram';
+import {Histogram} from './Histogram';
 import readline from 'readline';
 import {formatHistogram} from './format';
 
 const stdout = process.stdout;
 
 export function test(label: string, callback: () => void, options?: ICycleOptions): void {
-  const histogram = createHistogram();
+  const histogram = new Histogram();
 
   stdout.write(label + ' ');
 
@@ -20,7 +20,7 @@ export function test(label: string, callback: () => void, options?: ICycleOption
 export function valueTest<T>(values: Array<T>, label: string, callback: (value: T) => void, options?: ICycleOptions): void {
   const valueCount = values.length;
 
-  const histogram = createHistogram();
+  const histogram = new Histogram();
 
   stdout.write(label + ' ');
 
