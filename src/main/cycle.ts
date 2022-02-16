@@ -1,5 +1,6 @@
 import {performance} from 'perf_hooks';
 import {IHistogram} from './createHistogram';
+import {sleep} from 'parallel-universe';
 
 /**
  * The mode of duration calculation.
@@ -10,12 +11,12 @@ export const enum DurationMode {
    * Measure cycle duration as time spent on callback invocation, {@link ICycleOptions.beforeIteration} and
    * {@link ICycleOptions.afterIteration}.
    */
-  ABSOLUTE = 0,
+  TOTAL = 0,
 
   /**
    * Measure cycle duration as time spent on callback invocation exclusively.
    */
-  EFFECTIVE = 1,
+  EXCLUSIVE = 1,
 }
 
 export interface ICycleOptions {
@@ -23,30 +24,34 @@ export interface ICycleOptions {
   /**
    * The number of iterations before results are collected.
    *
-   * @default 0
+   * @default 1
    */
   warmupIterationCount?: number;
 
+  batchTimeout?: number;
+
   /**
-   * The timeout in milliseconds.
+   * The cycle timeout in milliseconds.
    *
-   * @default 3000
+   * @default 5000
    */
-  timeout?: number;
+  cycleTimeout?: number;
 
   /**
    * The mode of cycle duration calculation.
    *
-   * @default `DurationMode.EFFECTIVE`
+   * @default `DurationMode.EXCLUSIVE`
    */
   durationMode?: DurationMode;
 
   /**
-   * The required margin of error to abort the cycle.
+   * The required margin of error [0, 1] to abort the cycle.
    *
-   * @default 0.005
+   * @default 0.002
    */
   targetRme?: number;
+
+  afterWarmup?(): void;
 
   /**
    * The callback executed before each iteration.
@@ -69,16 +74,18 @@ export interface ICycleOptions {
 /**
  * Executes a callback and adds results to the histogram.
  *
- * @param callback The callback to execute.
+ * @param cb The callback to execute.
  * @param histogram The histogram to populate.
  * @param options The cycle options.
  */
-export function cycle(callback: () => void, histogram: IHistogram, options: ICycleOptions = {}): void {
+export function cycle(cb: () => void, histogram: IHistogram, options: ICycleOptions = {}): Promise<void> {
   const {
     warmupIterationCount = 1,
-    timeout = 3000,
-    durationMode = DurationMode.EFFECTIVE,
-    targetRme = 0.005,
+    batchTimeout = 1000,
+    cycleTimeout = 5000,
+    durationMode = DurationMode.EXCLUSIVE,
+    targetRme = 0.002,
+    afterWarmup,
     beforeIteration,
     afterIteration,
   } = options;
@@ -87,26 +94,41 @@ export function cycle(callback: () => void, histogram: IHistogram, options: ICyc
 
   while (i < warmupIterationCount) {
     beforeIteration?.(i, histogram);
-    callback();
+    cb();
     afterIteration?.(i, histogram);
     ++i;
   }
 
-  const cycleTimestamp = performance.now();
+  afterWarmup?.();
 
-  while (true) {
-    beforeIteration?.(i, histogram);
+  i = 0;
 
-    const iterationTimestamp = performance.now();
-    callback();
-    histogram.add(performance.now() - iterationTimestamp);
+  const cycleTs = Date.now();
 
-    const aborted = afterIteration?.(i, histogram) === false;
-    const duration = durationMode === DurationMode.EFFECTIVE ? histogram.getSum() : performance.now() - cycleTimestamp;
+  const nextBatch = (resolve: () => void) => {
+    const batchTs = Date.now();
+    while (true) {
+      beforeIteration?.(i, histogram);
 
-    if (aborted || duration > timeout || i > 2 && histogram.getRme() <= targetRme) {
-      break;
+      const iterationTs = performance.now();
+      cb();
+      histogram.add(performance.now() - iterationTs);
+
+      const aborted = afterIteration?.(i, histogram) === false;
+      const cycleDuration = durationMode === DurationMode.EXCLUSIVE ? histogram.getSum() : Date.now() - cycleTs;
+
+      if (aborted || cycleDuration > cycleTimeout || i > 2 && histogram.getRme() <= targetRme) {
+        resolve();
+        break;
+      }
+      const batchDuration = Date.now() - batchTs;
+      if (batchDuration > batchTimeout) {
+        sleep(1000).then(() => nextBatch(resolve));
+        return;
+      }
+      ++i;
     }
-    ++i;
-  }
+  };
+
+  return new Promise(nextBatch);
 }
