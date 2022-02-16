@@ -53,6 +53,10 @@ export interface ICycleOptions {
 
   afterWarmup?(): void;
 
+  beforeBatch?(): void;
+
+  afterBatch?(): void;
+
   /**
    * The callback executed before each iteration.
    *
@@ -105,7 +109,7 @@ export function cycle(cb: () => void, histogram: Histogram, options: ICycleOptio
 
   const cycleTs = Date.now();
 
-  const nextBatch = (resolve: () => void) => {
+  const nextBatch = (resolve: () => void): Promise<void> | void => {
     const batchTs = Date.now();
 
     while (true) {
@@ -126,8 +130,7 @@ export function cycle(cb: () => void, histogram: Histogram, options: ICycleOptio
       const batchDuration = Date.now() - batchTs;
 
       if (batchDuration > batchTimeout) {
-        sleep(1000).then(() => nextBatch(resolve));
-        return;
+        return sleep(1000).then(() => nextBatch(resolve));
       }
 
       ++i;
