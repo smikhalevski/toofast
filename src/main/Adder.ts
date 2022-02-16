@@ -6,14 +6,14 @@
  */
 export class Adder {
 
-  private _result = 0;
+  private _sum = 0;
   private _c = 0;
 
   /**
    * The total sum of added measurements.
    */
   public get sum(): number {
-    return this._result + this._c;
+    return this._sum + this._c;
   }
 
   /**
@@ -22,10 +22,10 @@ export class Adder {
    * @param x The measurement value.
    */
   public add(x: number): void {
-    const {_result} = this;
-    const t = _result + x;
+    const {_sum} = this;
+    const t = _sum + x;
 
-    this._c += Math.abs(_result) < Math.abs(x) ? x - t + _result : _result - t + x;
-    this._result = t;
+    this._c += Math.abs(_sum) < Math.abs(x) ? x - t + _sum : _sum - t + x;
+    this._sum = t;
   }
 }

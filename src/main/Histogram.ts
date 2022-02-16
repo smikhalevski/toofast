@@ -17,8 +17,8 @@ export class Histogram {
     1.960,
   ];
 
-  private _xAdder = new Adder();
-  private _sqxAdder = new Adder();
+  private _adder = new Adder();
+  private _sqAdder = new Adder();
 
   /**
    * The total number of added measurements.
@@ -26,15 +26,15 @@ export class Histogram {
   public size = 0;
 
   public get sum(): number {
-    return this._xAdder.sum;
+    return this._adder.sum;
   }
 
   /**
    * The mean value.
    */
   public get mean(): number {
-    const {size, _xAdder} = this;
-    return size === 0 ? 0 : _xAdder.sum / size;
+    const {size, _adder} = this;
+    return size === 0 ? 0 : _adder.sum / size;
   }
 
   /**
@@ -44,8 +44,8 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
    */
   public get variance(): number {
-    const {size, _sqxAdder, _xAdder} = this;
-    return size === 0 ? 0 : (_sqxAdder.sum - (_xAdder.sum * _xAdder.sum) / size) / size;
+    const {size, _sqAdder, _adder} = this;
+    return size === 0 ? 0 : (_sqAdder.sum - (_adder.sum * _adder.sum) / size) / size;
   }
 
   /**
@@ -63,14 +63,17 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error on Wikipedia}
    */
   public get sem(): number {
-    return this.sd / Math.sqrt(this.size);
+    const {size} = this;
+    return size === 0 ? 0 : this.sd / Math.sqrt(size);
   }
 
   /**
    * Margin of error.
    */
   public get moe(): number {
-    return this.sem * Histogram.tTable[Math.min(this.size, Histogram.tTable.length) - 1];
+    const {tTable} = Histogram;
+    const {size} = this;
+    return size === 0 ? 0 : this.sem * tTable[Math.min(size, tTable.length) - 1];
   }
 
   /**
@@ -79,14 +82,14 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error on Wikipedia}
    */
   public get rme(): number {
-    return this.moe / this.mean;
+    return this.size === 0 ? 0 : this.moe / this.mean;
   }
 
   /**
    * Number of executions per second.
    */
   public get hz(): number {
-    return 1000 / this.mean;
+    return this.size === 0 ? 0 : 1000 / this.mean;
   }
 
   /**
@@ -95,8 +98,8 @@ export class Histogram {
    * @param x The measurement value.
    */
   public add(x: number): void {
-    this._xAdder.add(x);
-    this._sqxAdder.add(x * x);
-    this.size++;
+    this._adder.add(x);
+    this._sqAdder.add(x * x);
+    ++this.size;
   }
 }
