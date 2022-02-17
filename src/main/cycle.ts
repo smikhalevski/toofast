@@ -8,8 +8,8 @@ import {Histogram} from './Histogram';
 export const enum DurationMode {
 
   /**
-   * Measure cycle duration as time spent on callback invocation, {@link ICycleOptions.beforeIteration} and
-   * {@link ICycleOptions.afterIteration}.
+   * Measure cycle duration as time spent on callback invocation, {@link TestOptions.beforeIteration} and
+   * {@link TestOptions.afterIteration}.
    */
   TOTAL = 0,
 
@@ -19,7 +19,7 @@ export const enum DurationMode {
   EXCLUSIVE = 1,
 }
 
-export interface ICycleOptions {
+export interface TestOptions {
 
   /**
    * The number of iterations before results are collected.
@@ -82,7 +82,7 @@ export interface ICycleOptions {
  * @param histogram The histogram to populate.
  * @param options The cycle options.
  */
-export function cycle(cb: () => void, histogram: Histogram, options: ICycleOptions = {}): Promise<void> {
+export function cycle(cb: () => void, histogram: Histogram, options: TestOptions = {}): Promise<void> {
   const {
     warmupIterationCount = 1,
     batchTimeout = 1000,
