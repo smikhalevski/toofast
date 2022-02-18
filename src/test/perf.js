@@ -1,11 +1,7 @@
-const {describe, test, afterBatch} = require('../../lib/node');
+const {describe, test} = require('../../lib/node');
 
 describe('foo', () => {
 
-  afterBatch(() => {
-    console.log('----');
-  });
-
-  test('bar', () => 1 + 1);
+  test('bar baz', () => 1 + 1);
   test('qux', () => 1 + 1);
 });
