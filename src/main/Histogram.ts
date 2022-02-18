@@ -77,7 +77,7 @@ export class Histogram {
   }
 
   /**
-   * Relative margin of error.
+   * Relative margin of error [0, 1].
    *
    * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error on Wikipedia}
    */

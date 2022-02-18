@@ -1,162 +1,204 @@
-import {cycle, TestOptions} from './cycle';
+import {cycle} from './cycle';
 import {Histogram} from './Histogram';
-import {Awaitable} from 'parallel-universe';
+import {AsyncHook, DescribeNode, DescribeOptions, NodeType, TestNode, TestOptions, TestSuiteNode} from './test-model';
+import {Awaitable, isPromiseLike} from 'parallel-universe';
 
-export interface TestHooks {
+export interface TestManager {
 
-  afterWarmup?(): Awaitable<void>;
+  node: TestSuiteNode;
+  protocol: TestProtocol;
 
-  beforeBatch?(): Awaitable<void>;
-
-  afterBatch?(): Awaitable<void>;
-
-  beforeIteration?(): Awaitable<void>;
-
-  afterIteration?(): Awaitable<void>;
+  start(): void;
 }
 
-export interface DescribeHooks extends TestHooks {
+export interface TestProtocol {
 
-  beforeEach?(): Awaitable<void>;
+  beforeEach(cb: () => Awaitable<void>): void;
 
-  afterEach?(): Awaitable<void>;
+  afterEach(cb: () => Awaitable<void>): void;
+
+  afterWarmup(cb: () => Awaitable<void>): void;
+
+  beforeBatch(cb: () => Awaitable<void>): void;
+
+  afterBatch(cb: () => Awaitable<void>): void;
+
+  beforeIteration(cb: () => void): void;
+
+  afterIteration(cb: () => void): void;
+
+  describe(label: string, cb: () => void, options?: DescribeOptions): void;
+
+  test(label: string, cb: () => void, options?: TestOptions): void;
 }
 
-export interface TestSuiteNode extends DescribeHooks {
-  type: 'testSuite';
-  children: (DescribeNode | TestNode)[];
+export type Handler<T> = (node: T) => Awaitable<void>;
+
+export interface TestManagerHandlers {
+  describeStarted: Handler<DescribeNode>;
+  describeCompleted: Handler<DescribeNode>;
+  testStarted: Handler<TestNode>;
+  testCompleted: Handler<TestNode>;
 }
 
-export interface DescribeNode extends DescribeHooks {
-  type: 'describe';
-  parentNode: TestSuiteNode | DescribeNode;
-  label: string;
-  children: (DescribeNode | TestNode)[];
-}
-
-export interface TestNode extends TestHooks {
-  type: 'test';
-  parentNode: TestSuiteNode | DescribeNode;
-  label: string;
-  options: TestOptions;
-  histogram: Histogram;
-  completed: boolean;
-  cb: () => Awaitable<void>;
-}
-
-export interface TestManagerOptions {
-
-  describeStarted(node: DescribeNode): void;
-
-  describeCompleted(node: DescribeNode): void;
-
-  testStarted(node: TestNode): void;
-
-  testCompleted(node: TestNode): void;
-}
-
-export function createTestManager(options: TestManagerOptions) {
+export function createTestManager(options: DescribeOptions, handlers: TestManagerHandlers): TestManager {
   const {
     describeStarted,
     describeCompleted,
     testStarted,
     testCompleted,
-  } = options;
+  } = handlers;
 
-  let run!: () => void;
-  let testPending = false;
-
-  const testSuiteNode: TestSuiteNode = {
-    type: 'testSuite',
-    children: [],
-  };
-
-  let parentNode: DescribeNode | TestSuiteNode = testSuiteNode;
-
+  let start!: () => void;
   let promise = new Promise<void>((resolve) => {
-    run = resolve;
+    start = resolve;
   });
 
-  const beforeEach = (cb: () => void): void => {
-    parentNode.beforeEach = cb;
+  const node: TestSuiteNode = {
+    nodeType: NodeType.TEST_SUITE,
+    children: [],
+    options,
+    promise,
   };
 
-  const afterEach = (cb: () => void): void => {
-    parentNode.afterEach = cb;
-  };
+  let parentNode: DescribeNode | TestSuiteNode = node;
 
-  const afterWarmup = (cb: () => void): void => {
-    parentNode.afterWarmup = cb;
-  };
+  const protocol: TestProtocol = {
 
-  const beforeBatch = (cb: () => void): void => {
-    parentNode.beforeBatch = cb;
-  };
+    beforeEach(cb) {
+      (parentNode.beforeEachHooks ||= []).push(cb);
+    },
+    afterEach(cb) {
+      (parentNode.afterEachHooks ||= []).push(cb);
+    },
+    afterWarmup(cb) {
+      (parentNode.afterWarmupHooks ||= []).push(cb);
+    },
+    beforeBatch(cb) {
+      (parentNode.beforeBatchHooks ||= []).push(cb);
+    },
+    afterBatch(cb) {
+      (parentNode.afterBatchHooks ||= []).push(cb);
+    },
+    beforeIteration(cb) {
+      (parentNode.beforeIterationHooks ||= []).push(cb);
+    },
+    afterIteration(cb) {
+      (parentNode.afterIterationHooks ||= []).push(cb);
+    },
 
-  const afterBatch = (cb: () => void): void => {
-    parentNode.afterBatch = cb;
-  };
+    describe(label, cb, options) {
+      promise = promise.then(() => describeStarted(node));
+      cb();
+      promise = promise.then(() => describeCompleted(node));
 
-  const beforeIteration = (cb: () => void): void => {
-    parentNode.beforeIteration = cb;
-  };
+      const node: DescribeNode = {
+        nodeType: NodeType.DESCRIBE,
+        parentNode,
+        label,
+        children: [],
+        promise,
+        options,
+      };
+      parentNode.children.push(node);
+    },
 
-  const afterIteration = (cb: () => void): void => {
-    parentNode.afterIteration = cb;
-  };
+    test(label, cb, options) {
+      promise = promise
+          .then(() => testStarted(node))
+          .then(() => cycle(node, createCycleOptions(node)))
+          .then(() => testCompleted(node));
 
-  const describe = (label: string, cb: () => void): void => {
-    const node: DescribeNode = {
-      type: 'describe',
-      parentNode,
-      label,
-      children: [],
-    };
-    parentNode.children.push(node);
-    promise = promise.then(() => describeStarted(node));
-    cb();
-    promise = promise.then(() => describeCompleted(node));
-  };
-
-  const test = (label: string, cb: () => void, options: TestOptions = {}): void => {
-    if (testPending) {
-      return;
-    }
-    const node: TestNode = {
-      type: 'test',
-      parentNode,
-      label,
-      options,
-      histogram: new Histogram(),
-      completed: false,
-      cb,
-    };
-    parentNode.children.push(node);
-    promise = promise.then(() => {
-      testPending = true;
-      testStarted(node);
-      return cycle(cb, node.histogram, options);
-    }).then(() => {
-      node.completed = true;
-      testPending = false;
-      testCompleted(node);
-    });
+      const node: TestNode = {
+        nodeType: NodeType.TEST,
+        parentNode,
+        label,
+        histogram: new Histogram(),
+        cb,
+        options,
+        promise,
+      };
+      parentNode.children.push(node);
+    },
   };
 
   return {
-    run,
-    protocol: {
+    node,
+    protocol,
+    start,
+  };
+}
 
-      beforeEach,
-      afterEach,
-      afterWarmup,
-      beforeBatch,
-      afterBatch,
-      beforeIteration,
-      afterIteration,
+export function createCycleOptions(node: TestSuiteNode | DescribeNode | TestNode) {
 
-      describe,
-      test,
-    },
+  const afterWarmupHooks: AsyncHook[] = [];
+  const beforeBatchHooks: AsyncHook[] = [];
+  const afterBatchHooks: AsyncHook[] = [];
+  const beforeIterationHooks: AsyncHook[] = [];
+  const afterIterationHooks: AsyncHook[] = [];
+
+  const options: TestOptions = {
+    afterWarmup: combineHooks(afterWarmupHooks),
+    beforeBatch: combineHooks(beforeBatchHooks),
+    afterBatch: combineHooks(afterBatchHooks),
+    beforeIteration: combineHooks(beforeIterationHooks),
+    afterIteration: combineHooks(afterIterationHooks),
+  };
+
+  while (true) {
+
+    Object.assign({}, node.options, options);
+
+    if (node.nodeType === NodeType.TEST_SUITE || node.nodeType === NodeType.DESCRIBE) {
+      push(afterWarmupHooks, node.afterWarmupHooks);
+      push(beforeBatchHooks, node.beforeBatchHooks);
+      push(afterBatchHooks, node.afterBatchHooks);
+      push(beforeIterationHooks, node.beforeIterationHooks);
+      push(afterIterationHooks, node.afterIterationHooks);
+    }
+    if (node.nodeType === NodeType.TEST) {
+      const options = node.options;
+      if (options) {
+        push(afterWarmupHooks, options.afterWarmup);
+        push(beforeBatchHooks, options.beforeBatch);
+        push(afterBatchHooks, options.afterBatch);
+        push(beforeIterationHooks, options.beforeIteration);
+        push(afterIterationHooks, options.afterIteration);
+      }
+    }
+    if (node.nodeType === NodeType.TEST_SUITE) {
+      break;
+    }
+    node = node.parentNode;
+  }
+
+  return options;
+}
+
+function push(hooks: AsyncHook[], hook: AsyncHook[] | AsyncHook | undefined): void {
+  if (hook == null) {
+    return;
+  }
+  if (Array.isArray(hook)) {
+    hooks.push(...hook);
+  } else {
+    hooks.push(hook);
+  }
+}
+
+function combineHooks(hooks: AsyncHook[]): AsyncHook {
+  const results: unknown[] = [];
+
+  return () => {
+    let async = false;
+
+    for (let i = 0; i < hooks.length; ++i) {
+      const result = hooks[i]();
+      async ||= isPromiseLike(result);
+      results[i] = result;
+    }
+    if (async) {
+      return Promise.allSettled(results) as Promise<any>;
+    }
   };
 }

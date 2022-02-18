@@ -10,8 +10,9 @@
     "lib"
   ],
   "scripts": {
-    "build": "tsc && npm run rollup",
-    "rollup": "rollup --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
+    "build": "tsc && npm run rollup && npm run rollup-node",
+    "rollup": "rollup --external parallel-universe --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
+    "rollup-node": "rollup --external parallel-universe --input ./lib/node.js --file ./lib/node.js --format cjs --plugin @rollup/plugin-node-resolve",
     "clean": "rm -rf ./lib",
     "test": "jest --detectOpenHandles",
     "docs": "typedoc ./src/main/index.ts",

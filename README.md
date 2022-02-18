@@ -19,7 +19,7 @@ function callback() {
   // The code you want to test goes here
 }
 
-test('My test', callback, {cycleTimeout: 3000});
+test('My test', callback, {testTimeout: 3000});
 // stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
 ```
 
@@ -33,7 +33,7 @@ function callback(value) {
   // The code you want to test goes here
 }
 
-valueTest([1, 2, 3], 'My test', callback, {cycleTimeout: 3000});
+valueTest([1, 2, 3], 'My test', callback, {testTimeout: 3000});
 // stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
 ```
 
@@ -48,7 +48,7 @@ function callback() {
 
 const histogram = createHistogram();
 
-cycle(callback, histogram, {cycleTimeout: 3000});
+cycle(callback, histogram, {testTimeout: 3000});
 
 histogram.getHz(); // → 7331041.16
 ```
