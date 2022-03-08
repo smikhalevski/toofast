@@ -1,9 +1,9 @@
 import {createTestManager, TestManager} from './createTestManager';
-import {DescribeOptions, NodeType} from './test-model';
+import {TestOptions, NodeType} from './test-model';
 import {bold, dim, green} from 'kleur/colors';
 import readline from 'readline';
 
-export function createNodeTestManager(options: DescribeOptions = {}): TestManager {
+export function createNodeTestManager(options: TestOptions = {}): TestManager {
 
   const numberFormat = new Intl.NumberFormat('en', {
     minimumFractionDigits: 2,

@@ -1,6 +1,15 @@
 import {cycle} from './cycle';
 import {Histogram} from './Histogram';
-import {AsyncHook, DescribeNode, DescribeOptions, NodeType, TestNode, TestOptions, TestSuiteNode} from './test-model';
+import {
+  AsyncHook,
+  DescribeNode,
+  TestOptions,
+  NodeType,
+  TestNode,
+  MeasureOptions,
+  TestProtocol,
+  TestSuiteNode
+} from './test-model';
 import {Awaitable, isPromiseLike} from 'parallel-universe';
 
 export interface TestManager {
@@ -11,26 +20,6 @@ export interface TestManager {
   start(): void;
 }
 
-export interface TestProtocol {
-
-  beforeEach(cb: () => Awaitable<void>): void;
-
-  afterEach(cb: () => Awaitable<void>): void;
-
-  afterWarmup(cb: () => Awaitable<void>): void;
-
-  beforeBatch(cb: () => Awaitable<void>): void;
-
-  afterBatch(cb: () => Awaitable<void>): void;
-
-  beforeIteration(cb: () => void): void;
-
-  afterIteration(cb: () => void): void;
-
-  describe(label: string, cb: () => void, options?: DescribeOptions): void;
-
-  test(label: string, cb: () => void, options?: TestOptions): void;
-}
 
 export type Handler<T> = (node: T) => Awaitable<void>;
 
@@ -41,7 +30,7 @@ export interface TestManagerHandlers {
   testCompleted: Handler<TestNode>;
 }
 
-export function createTestManager(options: DescribeOptions, handlers: TestManagerHandlers): TestManager {
+export function createTestManager(options: TestOptions, handlers: TestManagerHandlers): TestManager {
   const {
     describeStarted,
     describeCompleted,
@@ -58,7 +47,6 @@ export function createTestManager(options: DescribeOptions, handlers: TestManage
     nodeType: NodeType.TEST_SUITE,
     children: [],
     options,
-    promise,
   };
 
   let parentNode: DescribeNode | TestSuiteNode = node;
@@ -97,7 +85,6 @@ export function createTestManager(options: DescribeOptions, handlers: TestManage
         parentNode,
         label,
         children: [],
-        promise,
         options,
       };
       parentNode.children.push(node);
@@ -116,7 +103,6 @@ export function createTestManager(options: DescribeOptions, handlers: TestManage
         histogram: new Histogram(),
         cb,
         options,
-        promise,
       };
       parentNode.children.push(node);
     },
@@ -137,7 +123,7 @@ export function createCycleOptions(node: TestSuiteNode | DescribeNode | TestNode
   const beforeIterationHooks: AsyncHook[] = [];
   const afterIterationHooks: AsyncHook[] = [];
 
-  const options: TestOptions = {
+  const options: MeasureOptions = {
     afterWarmup: combineHooks(afterWarmupHooks),
     beforeBatch: combineHooks(beforeBatchHooks),
     afterBatch: combineHooks(afterBatchHooks),

@@ -1,6 +1,6 @@
-import {TestNode, TestOptions} from './test-model';
+import {TestNode, MeasureOptions} from './test-model';
 
-export function cycle(node: TestNode, options: TestOptions): Promise<void> {
+export function cycle(node: TestNode, options: MeasureOptions): Promise<void> {
   const {
     testTimeout = 5_000,
     targetRme = 0.002,
