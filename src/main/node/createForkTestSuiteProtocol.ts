@@ -1,4 +1,4 @@
-import {AsyncHook, Hook, MeasureOptions, TestSuiteProtocol} from "../test-model";
+import {AsyncHook, Hook, MeasureOptions, TestSuiteProtocol} from '../test-model';
 
 export function createForkTestSuiteProtocol(stack: number[]): TestSuiteProtocol {
 
@@ -24,6 +24,7 @@ export function createForkTestSuiteProtocol(stack: number[]): TestSuiteProtocol 
     run,
     promise,
     testProtocol: {
+
       beforeEach(cb) {
         beforeEachHooks.push(cb);
       },
@@ -55,6 +56,10 @@ export function createForkTestSuiteProtocol(stack: number[]): TestSuiteProtocol 
 
         // Apply options
         Object.assign(measureOptions, options);
+
+        cb();
+
+        j = -1;
       },
 
       test(label, cb, options) {
@@ -67,31 +72,50 @@ export function createForkTestSuiteProtocol(stack: number[]): TestSuiteProtocol 
         Object.assign(measureOptions, options);
 
         if (afterWarmupHooks.length) {
-          measureOptions.afterWarmup = () => {
-          };
+          measureOptions.afterWarmup = () => callAsyncHooks(afterWarmupHooks);
         }
         if (beforeBatchHooks.length) {
-          measureOptions.beforeBatch = () => {
-          };
+          measureOptions.beforeBatch = () => callAsyncHooks(beforeBatchHooks);
         }
         if (afterBatchHooks.length) {
-          measureOptions.afterBatch = () => {
-          };
+          measureOptions.afterBatch = () => callAsyncHooks(afterBatchHooks);
         }
         if (beforeIterationHooks.length) {
           measureOptions.beforeIteration = () => {
+            callHooks(beforeIterationHooks);
           };
         }
         if (afterIterationHooks.length) {
           measureOptions.afterIteration = () => {
+            callHooks(afterIterationHooks);
           };
         }
 
-        cb(() => {
-          // Run test here
-          return Promise.resolve();
-        });
+        promise
+            .then(() => callAsyncHooks(beforeEachHooks))
+            .then(() => {
+              cb((cb) => {
+                // Cycle cb here
+                cb();
+                return Promise.resolve();
+              });
+            })
+            .then(() => callAsyncHooks(afterEachHooks));
       },
     },
   };
+}
+
+function callHooks(hooks: Hook[]): void {
+  for (const hook of hooks) {
+    hook();
+  }
+}
+
+function callAsyncHooks(hooks: AsyncHook[]): Promise<void> {
+  let promise = Promise.resolve();
+  for (const hook of hooks) {
+    promise = promise.then(() => hook());
+  }
+  return promise;
 }

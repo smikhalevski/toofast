@@ -1,4 +1,4 @@
-import {TestSuiteProtocol} from "../test-model";
+import {TestSuiteProtocol} from '../test-model';
 
 export function createMainTestSuiteProtocol(runTest: (stack: number[]) => Promise<void>): TestSuiteProtocol {
 

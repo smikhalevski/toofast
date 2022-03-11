@@ -83,7 +83,7 @@ export interface TestProtocol {
 
   describe(label: string, cb: () => Awaitable<void>, options?: TestOptions): void;
 
-  test(label: string, cb: (measure: () => Promise<void>) => Awaitable<void>, options?: TestOptions): void;
+  test(label: string, cb: (measure: (cb: () => unknown) => Promise<void>) => Awaitable<void>, options?: TestOptions): void;
 }
 
 export interface TestSuiteProtocol {
@@ -93,40 +93,3 @@ export interface TestSuiteProtocol {
 
   run(): void;
 }
-
-declare global {
-
-  var beforeEach: (hook: AsyncHook) => void;
-
-  function afterEach(hook: AsyncHook): void;
-
-  function afterWarmup(hook: AsyncHook): void;
-
-  function beforeBatch(hook: AsyncHook): void;
-
-  function afterBatch(hook: AsyncHook): void;
-
-  function beforeIteration(hook: Hook): void;
-
-  function afterIteration(hook: Hook): void;
-
-  function describe(label: string, cb: () => Awaitable<void>, options?: TestOptions): void;
-
-  function test(label: string, cb: (measure: (cb: () => void, options?: MeasureOptions) => Promise<void>) => Awaitable<void>, options?: TestOptions): void;
-
-}
-
-
-beforeEach(() => {});
-
-beforeBatch(() => {
-  gc?.();
-});
-
-describe('', () => {
-
-  test('', (measure) => {
-    measure(() => {
-    });
-  });
-});
