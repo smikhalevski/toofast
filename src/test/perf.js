@@ -1,7 +1,10 @@
-const {describe, test} = require('../../lib/node');
-
 describe('foo', () => {
 
-  test('bar baz', () => 1 + 1);
-  test('qux', () => 1 + 1);
+  test('bar baz', (measure) => {
+    measure(() => 1 + 1);
+  });
+
+  test('qux', (measure) => {
+    measure(() => 'a' + 'b');
+  });
 });

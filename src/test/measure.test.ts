@@ -1,4 +1,4 @@
-import {cycle} from '../main/cycle';
+import {measure} from '../main/measure';
 import {createHistogram} from '../main/createHistogram';
 
 describe('cycle', () => {
@@ -6,7 +6,7 @@ describe('cycle', () => {
   test('invokes a callback', () => {
     const callbackMock = jest.fn();
 
-    cycle(callbackMock, createHistogram(), {cycleTimeout: 10});
+    measure(callbackMock, createHistogram(), {cycleTimeout: 10});
 
     expect(callbackMock.mock.calls.length).toBeGreaterThan(1);
   });
