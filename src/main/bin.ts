@@ -1,11 +1,11 @@
 import cluster from 'cluster';
 import fs from 'fs';
 import vm from 'vm';
-import {createWorkerTestSuiteProtocol} from './createWorkerTestSuiteProtocol';
+import {createWorkerProtocol} from './createWorkerProtocol';
 import {measure} from './measure';
 import {Histogram} from './Histogram';
 import path from 'path';
-import {createMasterTestSuiteProtocol} from './createMasterTestSuiteProtocol';
+import {createMasterProtocol} from './createMasterProtocol';
 import {sleep} from 'parallel-universe';
 
 interface StartMessage {
@@ -19,7 +19,7 @@ if (!cluster.worker) {
 
   const jsCode = fs.readFileSync(filePath, 'utf-8');
 
-  const testSuiteProtocol = createMasterTestSuiteProtocol({
+  const testSuiteProtocol = createMasterProtocol({
 
     runTest: (node) => new Promise((resolve, reject) => {
 
@@ -51,9 +51,9 @@ if (!cluster.worker) {
 
     const histogram = new Histogram();
 
-    const testSuiteProtocol = createWorkerTestSuiteProtocol({
+    const testSuiteProtocol = createWorkerProtocol({
       testPath: message.testPath,
-      measure: (cb, options) => measure(cb, histogram, options),
+      runMeasure: (cb, options) => measure(cb, histogram, options),
     });
 
     const vmContext = vm.createContext(testSuiteProtocol.testProtocol);

@@ -2,13 +2,17 @@ import {Histogram, measure, MeasureHandlers} from '../main';
 
 describe('measure', () => {
 
-  let handlers: MeasureHandlers;
+  const onErrorMock = jest.fn();
+  const onProgressMock = jest.fn();
+
+  const handlers: MeasureHandlers = {
+    onError: onErrorMock,
+    onProgress: onProgressMock,
+  };
 
   beforeEach(() => {
-    handlers = {
-      onProgress: jest.fn(),
-      onError: jest.fn(),
-    };
+    onErrorMock.mockClear();
+    onProgressMock.mockClear();
   });
 
   test('returns a Promise', () => {

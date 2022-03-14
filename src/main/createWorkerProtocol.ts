@@ -1,19 +1,40 @@
 import {Hook, MeasureOptions, SyncHook, TestProtocol} from './test-types';
+import {Histogram} from './Histogram';
+import {measure, MeasureHandlers} from './measure';
 
-export interface WorkerTestSuiteProtocolOptions {
-  testPath: number[];
+export interface WorkerHandlers extends MeasureHandlers {
 
-  measure(cb: () => unknown, options: MeasureOptions): Promise<void>;
+  /**
+   * Triggered when test is completed.
+   *
+   * @param histogram The histogram that represents tested callback performance statistics.
+   */
+  onComplete(histogram: Histogram): void;
 }
 
-export function createWorkerTestSuiteProtocol(options: WorkerTestSuiteProtocolOptions) {
+export interface WorkerProtocolOptions {
+
+  /**
+   * Indices of describe and test DSL blocks that must be run.
+   */
+  testPath: number[];
+
+  /**
+   * Measures callback performance.
+   */
+  runMeasure: typeof measure;
+}
+
+export function createWorkerProtocol(handlers: WorkerHandlers, options: WorkerProtocolOptions) {
+  const {onComplete} = handlers;
+
   const {
     testPath,
-    measure,
+    runMeasure,
   } = options;
 
   let run!: () => void;
-  let testPromise = new Promise<void>((resolve) => {
+  let promise = new Promise<void>((resolve) => {
     run = resolve;
   });
 
@@ -55,7 +76,7 @@ export function createWorkerTestSuiteProtocol(options: WorkerTestSuiteProtocolOp
     },
 
     describe(label, cb, options) {
-      if (i === testPath.length - 1 || j++ !== testPath[i]) {
+      if (i >= testPath.length - 1 || j++ !== testPath[i]) {
         return;
       }
       i++;
@@ -69,7 +90,7 @@ export function createWorkerTestSuiteProtocol(options: WorkerTestSuiteProtocolOp
       if (i !== testPath.length - 1 || j++ !== testPath[i]) {
         return;
       }
-      j = -1;
+      i++;
 
       Object.assign(measureOptions, options);
 
@@ -80,24 +101,36 @@ export function createWorkerTestSuiteProtocol(options: WorkerTestSuiteProtocolOp
       measureOptions.afterIteration = afterIterationHooks ? () => callSyncHooks(afterIterationHooks) : undefined;
 
       if (beforeEachHooks) {
-        testPromise = testPromise.then(() => callHooks(beforeEachHooks));
+        promise = promise.then(() => callHooks(beforeEachHooks));
       }
 
-      testPromise = testPromise.then(() => {
-        let measurePromise = Promise.resolve();
+      promise = promise.then(() => {
+        let promise = Promise.resolve();
 
-        return Promise.resolve(cb((cb) => measurePromise = measurePromise.then(() => measure(cb, Object.assign({}, measureOptions))))).then(() => measurePromise);
+        const histogram = new Histogram();
+
+        const result = cb((cb) => promise = promise.then(() => {
+          const cbHistogram = new Histogram();
+
+          return runMeasure(cb, cbHistogram, handlers, Object.assign({}, measureOptions)).then(() => {
+            histogram.addFromHistogram(cbHistogram);
+          });
+        }));
+
+        return Promise.resolve(result).then(() => promise).then(() => {
+          onComplete(histogram);
+        });
       });
 
       if (afterEachHooks) {
-        testPromise = testPromise.then(() => callHooks(afterEachHooks));
+        promise = promise.then(() => callHooks(afterEachHooks));
       }
     },
   };
 
   return {
     testProtocol,
-    promise: testPromise,
+    getPromise: () => promise,
     run,
   };
 }
@@ -110,6 +143,7 @@ function callSyncHooks(hooks: SyncHook[]): void {
 
 function callHooks(hooks: Hook[]): Promise<void> {
   let promise = Promise.resolve();
+
   for (const hook of hooks) {
     promise = promise.then(hook);
   }

@@ -1,11 +1,12 @@
 import {DescribeNode, NodeType, TestNode, TestSuiteNode} from './node-types';
 import {TestProtocol} from './test-types';
+import {noop} from './utils';
 
-export interface MasterTestSuiteProtocolOptions {
+export interface MasterProtocolOptions {
   runTest(node: TestNode): Promise<void>;
 }
 
-export function createMasterTestSuiteProtocol(options: MasterTestSuiteProtocolOptions) {
+export function createMasterProtocol(options: MasterProtocolOptions) {
   const {runTest} = options;
 
   let run!: () => void;
@@ -73,7 +74,4 @@ export function createMasterTestSuiteProtocol(options: MasterTestSuiteProtocolOp
     promise: testSuitePromise,
     run,
   };
-}
-
-function noop() {
 }
