@@ -13,10 +13,40 @@ export type Describe = (label: string, cb: () => Awaitable<void>, options?: Test
 export type Test = (label: string, cb: (measure: (cb: () => unknown) => Promise<void>) => Awaitable<void>, options?: TestOptions) => void;
 
 export interface TestOptions {
-  testTimeout?: number;
+
+  /**
+   * Maximum measure duration. Doesn't include the duration of warmup iterations.
+   *
+   * @default 5000
+   */
+  measureTimeout?: number;
+
+  /**
+   * The maximum relative margin of error that must be reached for each measurement [0, 1].
+   *
+   * @default 0.002
+   */
   targetRme?: number;
+
+  /**
+   * The maximum number of warmup iterations that are run before each measurement.
+   *
+   * @default 1
+   */
   warmupIterationCount?: number;
+
+  /**
+   * The maximum number of iterations in a batch.
+   *
+   * @default Infinity
+   */
   batchIterationCount?: number;
+
+  /**
+   * The maximum batch duration.
+   *
+   * @default 1_000
+   */
   batchTimeout?: number;
 }
 

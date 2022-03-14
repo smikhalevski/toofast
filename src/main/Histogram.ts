@@ -41,8 +41,8 @@ export class Histogram {
    */
   public getVariance(): number {
     const {size, _sqAdder, _adder} = this;
-    const t = _adder.getSum();
-    return size === 0 ? 0 : (_sqAdder.getSum() - (t * t) / size) / size;
+    const sum = _adder.getSum();
+    return size === 0 ? 0 : (_sqAdder.getSum() - (sum * sum) / size) / size;
   }
 
   /**
@@ -55,7 +55,7 @@ export class Histogram {
   }
 
   /**
-   * Standard error of the mean.
+   * The standard error of the mean.
    *
    * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error on Wikipedia}
    */
@@ -65,7 +65,7 @@ export class Histogram {
   }
 
   /**
-   * Margin of error.
+   * The margin of error.
    */
   public getMoe(): number {
     const {tTable} = Histogram;
@@ -74,7 +74,7 @@ export class Histogram {
   }
 
   /**
-   * Relative margin of error [0, 1].
+   * The relative margin of error [0, 1].
    *
    * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error on Wikipedia}
    */
@@ -83,7 +83,7 @@ export class Histogram {
   }
 
   /**
-   * Number of executions per second.
+   * The number of executions per second.
    */
   public getHz(): number {
     return this.size === 0 ? 0 : 1000 / this.getMean();
@@ -98,5 +98,16 @@ export class Histogram {
     this._adder.add(x);
     this._sqAdder.add(x * x);
     ++this.size;
+  }
+
+  /**
+   * Adds measurements from another histogram.
+   *
+   * @param histogram The histogram to add measurements from.
+   */
+  public addFromHistogram(histogram: Histogram): void {
+    this._adder.add(histogram._adder.getSum());
+    this._sqAdder.add(histogram._sqAdder.getSum());
+    this.size += histogram.size;
   }
 }
