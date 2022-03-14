@@ -48,7 +48,7 @@ export function measure(cb: () => unknown, histogram: Histogram, options: Measur
 
       afterIteration?.();
 
-      if (Date.now() - measureTs > testTimeout || i > 2 && histogram.rme <= targetRme) {
+      if (Date.now() - measureTs > testTimeout || i > 2 && histogram.getRme() <= targetRme) {
         return Promise.resolve().then(afterBatch);
       }
 

@@ -1,7 +1,7 @@
 import {Adder} from './Adder';
 
 /**
- * Provides access to population statistics.
+ * Provides access to mutable population statistics.
  */
 export class Histogram {
 
@@ -25,16 +25,12 @@ export class Histogram {
    */
   public size = 0;
 
-  public get sum(): number {
-    return this._adder.sum;
-  }
-
   /**
    * The mean value.
    */
-  public get mean(): number {
+  public getMean(): number {
     const {size, _adder} = this;
-    return size === 0 ? 0 : _adder.sum / size;
+    return size === 0 ? 0 : _adder.getSum() / size;
   }
 
   /**
@@ -43,9 +39,10 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Variance Variance on Wikipedia}
    * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
    */
-  public get variance(): number {
+  public getVariance(): number {
     const {size, _sqAdder, _adder} = this;
-    return size === 0 ? 0 : (_sqAdder.sum - (_adder.sum * _adder.sum) / size) / size;
+    const t = _adder.getSum();
+    return size === 0 ? 0 : (_sqAdder.getSum() - (t * t) / size) / size;
   }
 
   /**
@@ -53,8 +50,8 @@ export class Histogram {
    *
    * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation on Wikipedia}
    */
-  public get sd(): number {
-    return Math.sqrt(this.variance);
+  public getSd(): number {
+    return Math.sqrt(this.getVariance());
   }
 
   /**
@@ -62,18 +59,18 @@ export class Histogram {
    *
    * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error on Wikipedia}
    */
-  public get sem(): number {
+  public getSem(): number {
     const {size} = this;
-    return size === 0 ? 0 : this.sd / Math.sqrt(size);
+    return size === 0 ? 0 : this.getSd() / Math.sqrt(size);
   }
 
   /**
    * Margin of error.
    */
-  public get moe(): number {
+  public getMoe(): number {
     const {tTable} = Histogram;
     const {size} = this;
-    return size === 0 ? 0 : this.sem * tTable[Math.min(size, tTable.length) - 1];
+    return size === 0 ? 0 : this.getSem() * tTable[Math.min(size, tTable.length) - 1];
   }
 
   /**
@@ -81,15 +78,15 @@ export class Histogram {
    *
    * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error on Wikipedia}
    */
-  public get rme(): number {
-    return this.size === 0 ? 0 : this.moe / this.mean;
+  public getRme(): number {
+    return this.size === 0 ? 0 : this.getMoe() / this.getMean();
   }
 
   /**
    * Number of executions per second.
    */
-  public get hz(): number {
-    return this.size === 0 ? 0 : 1000 / this.mean;
+  public getHz(): number {
+    return this.size === 0 ? 0 : 1000 / this.getMean();
   }
 
   /**

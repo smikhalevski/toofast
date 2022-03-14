@@ -12,7 +12,7 @@ export class Adder {
   /**
    * The total sum of added measurements.
    */
-  public get sum(): number {
+  public getSum(): number {
     return this._sum + this._c;
   }
 
