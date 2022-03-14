@@ -5,13 +5,17 @@
   "main": "./lib/index-cjs.js",
   "module": "./lib/index.js",
   "types": "./lib/index.d.ts",
+  "bin": {
+    "toofast": "./lib/bin.js"
+  },
   "sideEffects": false,
   "files": [
     "lib"
   ],
   "scripts": {
-    "build": "tsc && npm run rollup",
-    "rollup": "rollup --no-treeshake --external kleur,parallel-universe --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
+    "build": "tsc && npm run rollup && npm run rollup-bin",
+    "rollup": "rollup --external kleur,parallel-universe --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
+    "rollup-bin": "rollup --no-treeshake --external kleur,parallel-universe --input ./lib/bin.js --file ./lib/bin.js --format cjs --plugin @rollup/plugin-node-resolve",
     "clean": "rm -rf ./lib",
     "test": "jest --detectOpenHandles",
     "docs": "typedoc ./src/main/index.ts",

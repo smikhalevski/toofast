@@ -9,7 +9,7 @@ export interface WorkerHandlers extends MeasureHandlers {
    *
    * @param histogram The histogram that represents tested callback performance statistics.
    */
-  onComplete(histogram: Histogram): void;
+  onTestComplete(histogram: Histogram): void;
 }
 
 export interface WorkerProtocolOptions {
@@ -26,7 +26,7 @@ export interface WorkerProtocolOptions {
 }
 
 export function createWorkerProtocol(handlers: WorkerHandlers, options: WorkerProtocolOptions) {
-  const {onComplete} = handlers;
+  const {onTestComplete} = handlers;
 
   const {
     testPath,
@@ -118,7 +118,7 @@ export function createWorkerProtocol(handlers: WorkerHandlers, options: WorkerPr
         }));
 
         return Promise.resolve(result).then(() => promise).then(() => {
-          onComplete(histogram);
+          onTestComplete(histogram);
         });
       });
 

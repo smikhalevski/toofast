@@ -1,7 +1,9 @@
 describe('foo', () => {
 
   test('bar baz', (cycle) => {
-    cycle(() => 1 + 1);
+    cycle(() => {
+    throw new Error('shit')
+    });
   });
 
   test('qux', (measure) => {

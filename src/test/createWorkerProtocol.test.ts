@@ -2,29 +2,29 @@ import {createWorkerProtocol, WorkerHandlers} from '../main';
 
 describe('createWorkerProtocol', () => {
 
-  const measureMock = jest.fn(() => Promise.resolve());
+  const runMeasureMock = jest.fn(() => Promise.resolve());
   const onErrorMock = jest.fn();
   const onProgressMock = jest.fn();
-  const onCompleteMock = jest.fn();
+  const onTestCompleteMock = jest.fn();
 
   const handlers: WorkerHandlers = {
     onError: onErrorMock,
     onProgress: onProgressMock,
-    onComplete: onCompleteMock,
+    onTestComplete: onTestCompleteMock,
   };
 
   beforeEach(() => {
-    measureMock.mockClear();
+    runMeasureMock.mockClear();
     onErrorMock.mockClear();
     onProgressMock.mockClear();
-    onCompleteMock.mockClear();
+    onTestCompleteMock.mockClear();
   });
 
   test('runs the protocol', async () => {
 
     const testedCb = () => undefined;
 
-    const protocol = createWorkerProtocol(handlers, {testPath: [1, 1, 1], runMeasure: measureMock});
+    const protocol = createWorkerProtocol(handlers, {testPath: [1, 1, 1], runMeasure: runMeasureMock});
 
     const t = protocol.testProtocol;
 
@@ -64,6 +64,6 @@ describe('createWorkerProtocol', () => {
 
     await protocol.getPromise();
 
-    expect(measureMock).toHaveBeenCalledTimes(1);
+    expect(runMeasureMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,15 +2,33 @@ import {DescribeNode, NodeType, TestNode, TestSuiteNode} from './node-types';
 import {TestProtocol} from './test-types';
 import {noop} from './utils';
 
+export interface MasterHandlers {
+
+  onDescribeStart(node: DescribeNode): void;
+
+  onDescribeEnd(node: DescribeNode): void;
+
+  onTestStart(node: TestNode): void;
+
+  onTestEnd(node: TestNode): void;
+}
+
 export interface MasterProtocolOptions {
   runTest(node: TestNode): Promise<void>;
 }
 
-export function createMasterProtocol(options: MasterProtocolOptions) {
+export function createMasterProtocol(handlers: MasterHandlers, options: MasterProtocolOptions) {
+  const {
+    onDescribeStart,
+    onDescribeEnd,
+    onTestStart,
+    onTestEnd,
+  } = handlers;
+
   const {runTest} = options;
 
   let run!: () => void;
-  let testSuitePromise = new Promise<void>((resolve) => {
+  let promise = new Promise<void>((resolve) => {
     run = resolve;
   });
 
@@ -43,10 +61,19 @@ export function createMasterProtocol(options: MasterProtocolOptions) {
 
       parentNode.children.push(node);
       parentNode = node;
-      testPath[i++]++;
-      testPath[i] = 0;
+
+      testPath[i]++;
+      testPath[++i] = -1;
+
+      promise = promise.then(() => {
+        onDescribeStart(node);
+      });
 
       cb();
+
+      promise = promise.then(() => {
+        onDescribeEnd(node);
+      });
 
       parentNode = node.parentNode;
       i--;
@@ -64,14 +91,19 @@ export function createMasterProtocol(options: MasterProtocolOptions) {
 
       parentNode.children.push(node);
 
-      testSuitePromise = testSuitePromise.then(() => runTest(node));
+      promise = promise.then(() => {
+        onTestStart(node);
+        return runTest(node);
+      }).then(() => {
+        onTestEnd(node);
+      });
     },
   };
 
   return {
     node,
     testProtocol,
-    promise: testSuitePromise,
+    getPromise: () => promise,
     run,
   };
 }
