@@ -2,17 +2,29 @@ import {MeasureLifecycleHandlers, measureLifecycle} from '../main/measureLifecyc
 
 describe('measureLifecycle', () => {
 
-  const onErrorMock = jest.fn();
-  const onProgressMock = jest.fn();
+  const onMeasureWarmupStartMock = jest.fn();
+  const onMeasureWarmupEndMock = jest.fn();
+  const onMeasureStartMock = jest.fn();
+  const onMeasureEndMock = jest.fn();
+  const onMeasureErrorMock = jest.fn();
+  const onMeasureProgressMock = jest.fn();
 
   const handlers: MeasureLifecycleHandlers = {
-    onMeasureError: onErrorMock,
-    onMeasureProgress: onProgressMock,
+    onMeasureWarmupStart: onMeasureWarmupStartMock,
+    onMeasureWarmupEnd: onMeasureWarmupEndMock,
+    onMeasureStart: onMeasureStartMock,
+    onMeasureEnd: onMeasureEndMock,
+    onMeasureError: onMeasureErrorMock,
+    onMeasureProgress: onMeasureProgressMock,
   };
 
   beforeEach(() => {
-    onErrorMock.mockClear();
-    onProgressMock.mockClear();
+    onMeasureWarmupStartMock.mockClear();
+    onMeasureWarmupEndMock.mockClear();
+    onMeasureStartMock.mockClear();
+    onMeasureEndMock.mockClear();
+    onMeasureErrorMock.mockClear();
+    onMeasureProgressMock.mockClear();
   });
 
   test('returns a Promise', () => {
@@ -109,5 +121,27 @@ describe('measureLifecycle', () => {
     expect(afterBatchMock.mock.calls.length).toBe(beforeBatchMock.mock.calls.length);
     expect(beforeIterationMock).toHaveBeenCalledTimes(histogram.size);
     expect(afterIterationMock).toHaveBeenCalledTimes(histogram.size);
+
+    expect(onMeasureWarmupStartMock).not.toHaveBeenCalled();
+    expect(onMeasureWarmupEndMock).not.toHaveBeenCalled();
+    expect(onMeasureStartMock).toHaveBeenCalledTimes(1);
+    expect(onMeasureEndMock).toHaveBeenCalledTimes(1);
+    expect(onMeasureErrorMock).not.toHaveBeenCalled();
+    expect(onMeasureProgressMock).toHaveBeenCalledTimes(histogram.size + 1);
+
+    expect(onMeasureProgressMock).toHaveBeenNthCalledWith(1, 0);
+    expect(onMeasureProgressMock).toHaveBeenLastCalledWith(1)
+  });
+
+  test('captures errors in measured callback', async () => {
+    const histogram = await measureLifecycle(() => {
+      throw new Error();
+    }, handlers, {
+      measureTimeout: 10,
+      warmupIterationCount: 0,
+    });
+
+    expect(histogram.size).toBeGreaterThan(100);
+    expect(onMeasureErrorMock).toHaveBeenCalledTimes(histogram.size);
   });
 });

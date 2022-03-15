@@ -1,54 +1,62 @@
 import {createTestSuiteLifecycle, DescribeNode, TestSuiteLifecycleHandlers, NodeType, TestNode, TestSuiteNode} from '../main';
 
-describe('createMasterProtocol', () => {
+describe('createTestSuiteLifecycle', () => {
 
-  const runTestMock = jest.fn(() => Promise.resolve());
+  const testLifecycleMock = jest.fn(() => Promise.resolve());
+
+  const onDescribeDeclarationStartMock = jest.fn();
+  const onDescribeDeclarationEndMock = jest.fn();
+  const onTestDeclarationStartMock = jest.fn();
+  const onTestDeclarationEndMock = jest.fn();
   const onDescribeStartMock = jest.fn();
   const onDescribeEndMock = jest.fn();
-  const onTestStartMock = jest.fn();
-  const onTestEndMock = jest.fn();
 
   const handlers: TestSuiteLifecycleHandlers = {
-    onDescribeDeclarationStart: onDescribeStartMock,
-    onDescribeDeclarationEnd: onDescribeEndMock,
-    onTestDeclarationStart: onTestStartMock,
-    onTestDeclarationEnd: onTestEndMock,
+    onDescribeDeclarationStart: onDescribeDeclarationStartMock,
+    onDescribeDeclarationEnd: onDescribeDeclarationEndMock,
+    onTestDeclarationStart: onTestDeclarationStartMock,
+    onTestDeclarationEnd: onTestDeclarationEndMock,
+    onDescribeStart: onDescribeStartMock,
+    onDescribeEnd: onDescribeEndMock,
   };
 
   beforeEach(() => {
-    runTestMock.mockClear();
+    testLifecycleMock.mockClear();
+
+    onDescribeDeclarationStartMock.mockClear();
+    onDescribeDeclarationEndMock.mockClear();
+    onTestDeclarationStartMock.mockClear();
+    onTestDeclarationEndMock.mockClear();
     onDescribeStartMock.mockClear();
     onDescribeEndMock.mockClear();
-    onTestStartMock.mockClear();
-    onTestEndMock.mockClear();
   });
 
   test('assembles nodes', () => {
-    const protocol = createTestSuiteLifecycle(handlers, {runTest: runTestMock});
+    const lifecycle = createTestSuiteLifecycle(testLifecycleMock, handlers);
 
-    const t = protocol.testProtocol;
+    const r = lifecycle.runtime;
 
-    t.describe('0', () => {
+    r.describe('0', () => {
 
-      t.test('0.0', () => undefined);
+      r.test('0.0', () => undefined);
     });
 
-    t.describe('1', () => {
+    r.describe('1', () => {
 
-      t.describe('1.0', () => {
+      r.describe('1.0', () => {
 
-        t.test('1.0.0', () => undefined);
+        r.test('1.0.0', () => undefined);
       });
 
-      t.describe('1.1', () => {
+      r.describe('1.1', () => {
 
-        t.test('1.1.0', () => undefined);
+        r.test('1.1.0', () => undefined);
 
-        t.test('1.1.1', () => undefined);
+        r.test('1.1.1', () => undefined);
       });
     });
 
-    t.test('2', () => undefined);
+    r.test('2', () => undefined);
 
     const node: TestSuiteNode = {
       nodeType: NodeType.TEST_SUITE,
@@ -67,7 +75,6 @@ describe('createMasterProtocol', () => {
       nodeType: NodeType.TEST,
       parentNode: node0,
       label: '0.0',
-      testPath: [0, 0]
     };
     node0.children.push(node00);
 
@@ -91,7 +98,6 @@ describe('createMasterProtocol', () => {
       nodeType: NodeType.TEST,
       parentNode: node10,
       label: '1.0.0',
-      testPath: [1, 0, 0],
     };
     node10.children.push(node100);
 
@@ -107,7 +113,6 @@ describe('createMasterProtocol', () => {
       nodeType: NodeType.TEST,
       parentNode: node11,
       label: '1.1.0',
-      testPath: [1, 1, 0],
     };
     node11.children.push(node110);
 
@@ -115,7 +120,6 @@ describe('createMasterProtocol', () => {
       nodeType: NodeType.TEST,
       parentNode: node11,
       label: '1.1.1',
-      testPath: [1, 1, 1],
     };
     node11.children.push(node111);
 
@@ -123,35 +127,34 @@ describe('createMasterProtocol', () => {
       nodeType: NodeType.TEST,
       parentNode: node,
       label: '2',
-      testPath: [2],
     };
     node.children.push(node2);
 
-    expect(protocol.node).toEqual(node);
+    expect(lifecycle.node).toEqual(node);
   });
 
-  test('runs the protocol', async () => {
+  test('runs the lifecycle', async () => {
 
-    const protocol = createTestSuiteLifecycle(handlers, {runTest: runTestMock});
+    const lifecycle = createTestSuiteLifecycle(testLifecycleMock, handlers);
 
-    const t = protocol.testProtocol;
+    const r = lifecycle.runtime;
 
-    t.describe('0', () => {
-      t.test('0.0', () => undefined);
+    r.describe('0', () => {
+      r.test('0.0', () => undefined);
     });
-    t.test('2', () => undefined);
+    r.test('2', () => undefined);
 
-    protocol.run();
+    await lifecycle.run();
 
-    await protocol.getPromise();
+    expect(testLifecycleMock).toHaveBeenCalledTimes(2);
+    expect(testLifecycleMock).toHaveBeenNthCalledWith(1, (lifecycle.node.children[0] as DescribeNode).children[0]);
+    expect(testLifecycleMock).toHaveBeenNthCalledWith(2, lifecycle.node.children[1]);
 
-    expect(runTestMock).toHaveBeenCalledTimes(2);
-    expect(runTestMock).toHaveBeenNthCalledWith(1, (protocol.node.children[0] as DescribeNode).children[0]);
-    expect(runTestMock).toHaveBeenNthCalledWith(2, protocol.node.children[1]);
-
+    expect(onDescribeDeclarationStartMock).toHaveBeenCalledTimes(1);
+    expect(onDescribeDeclarationEndMock).toHaveBeenCalledTimes(1);
+    expect(onTestDeclarationStartMock).toHaveBeenCalledTimes(2);
+    expect(onTestDeclarationEndMock).toHaveBeenCalledTimes(2);
     expect(onDescribeStartMock).toHaveBeenCalledTimes(1);
     expect(onDescribeEndMock).toHaveBeenCalledTimes(1);
-    expect(onTestStartMock).toHaveBeenCalledTimes(2);
-    expect(onTestEndMock).toHaveBeenCalledTimes(2);
   });
 });
