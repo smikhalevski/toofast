@@ -68,7 +68,7 @@ export interface MeasureOptions extends TestOptions {
 /**
  * Functions that are exposed in a test script.
  */
-export interface Protocol {
+export interface Runtime {
   beforeEach: MountHook;
   afterEach: MountHook;
   afterWarmup: MountHook;

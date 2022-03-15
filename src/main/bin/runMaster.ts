@@ -1,61 +1,66 @@
 import {createTestSuiteLifecycle, TestSuiteLifecycleHandlers} from '../createTestSuiteLifecycle';
-import {Message, MessageType, Stats, TestLifecycleInitMessage} from './bin-types';
-import {handleMessage} from './utils';
+import {MasterMessage, MessageType, Stats, TestLifecycleInitMessage} from './bin-types';
 import path from 'path';
 import fs from 'fs';
 import cluster from 'cluster';
 import vm from 'vm';
-import {TestLifecycleHandlers} from '../createTestLifecycle';
+import {extractTestPath, handleMasterMessage} from './utils';
+import {TestNode, TestSuiteNode} from '../node-types';
 
-export interface MasterLifecycleHandlers extends Required<TestSuiteLifecycleHandlers>, Required<TestLifecycleHandlers<Stats>> {
+export interface MasterLifecycleHandlers extends TestSuiteLifecycleHandlers {
 
-  onTestError(error: any): void;
+  onTestStart(node: TestNode): void;
 
-  onTestSuiteError(error: any): void;
+  onTestEnd(node: TestNode, stats: Stats): void;
+
+  onTestError(node: TestNode, error: any): void;
+
+  onTestSuiteError(node: TestSuiteNode, error: any): void;
+
+  onMeasureWarmupStart(node: TestNode): void;
+
+  onMeasureWarmupEnd(node: TestNode): void;
+
+  onMeasureStart(node: TestNode): void;
+
+  onMeasureEnd(node: TestNode, stats: Stats): void;
+
+  onMeasureError(node: TestNode, error: any): void;
+
+  onMeasureProgress(node: TestNode, percent: number): void;
 }
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
-  const {
-    onTestStart,
-    onTestEnd,
-    onTestError,
-    onTestSuiteError,
-    onMeasureWarmupStart,
-    onMeasureWarmupEnd,
-    onMeasureStart,
-    onMeasureEnd,
-    onMeasureError,
-    onMeasureProgress,
-  } = handlers;
+  let testNode: TestNode;
 
-  const handleWorkerMessage = (message: Message) => handleMessage(message, {
+  const handleWorkerMessage = (message: MasterMessage) => handleMasterMessage(message, {
     onTestStartMessage() {
-      onTestStart();
+      handlers.onTestStart(testNode);
     },
     onTestEndMessage(message) {
-      onTestEnd(message.stats);
+      handlers.onTestEnd(testNode, message.stats);
     },
     onTestErrorMessage(message) {
-      onTestError(message.message);
+      handlers.onTestError(testNode, message.message);
     },
     onMeasureWarmupStartMessage() {
-      onMeasureWarmupStart();
+      handlers.onMeasureWarmupStart(testNode);
     },
     onMeasureWarmupEndMessage() {
-      onMeasureWarmupEnd();
+      handlers.onMeasureWarmupEnd(testNode);
     },
     onMeasureStartMessage() {
-      onMeasureStart();
+      handlers.onMeasureStart(testNode);
     },
     onMeasureEndMessage(message) {
-      onMeasureEnd(message.stats);
+      handlers.onMeasureEnd(testNode, message.stats);
     },
     onMeasureErrorMessage(message) {
-      onMeasureError(message.message);
+      handlers.onMeasureError(testNode, message.message);
     },
     onMeasureProgressMessage(message) {
-      onMeasureProgress(message.percent);
+      handlers.onMeasureProgress(testNode, message.percent);
     },
   });
 
@@ -63,31 +68,35 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
 
   const jsCode = fs.readFileSync(filePath, 'utf-8');
 
-  const lifecycle = createTestSuiteLifecycle((testPath) => new Promise((resolve) => {
+  const lifecycle = createTestSuiteLifecycle((node) => new Promise((resolve) => {
+    testNode = node;
+
     const worker = cluster.fork();
 
     worker.on('message', handleWorkerMessage);
     worker.on('exit', resolve);
     worker.on('error', (error) => {
-      onTestError(error);
+      handlers.onTestError(testNode, error);
       resolve();
     });
 
     const message: TestLifecycleInitMessage = {
       type: MessageType.TEST_LIFECYCLE_INIT,
       filePath,
-      testPath,
+      testPath: extractTestPath(node),
     };
 
     worker.send(message);
 
   }), handlers);
 
-  const vmContext = vm.createContext(lifecycle.protocol);
+  const vmContext = vm.createContext(lifecycle.runtime);
 
   vm.runInContext(jsCode, vmContext);
 
-  lifecycle.run().catch(onTestSuiteError).then(() => {
-    process.exit(0);
-  });
+  lifecycle.run()
+      .catch((error) => handlers.onTestSuiteError(lifecycle.node, error))
+      .then(() => {
+        process.exit(0);
+      });
 }

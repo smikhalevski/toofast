@@ -53,31 +53,32 @@ export interface Stats {
   hz: number;
 }
 
-export interface MessageHandler {
+export interface MasterMessageHandler {
 
-  onTestLifecycleInitMessage?(message: TestLifecycleInitMessage): void;
+  onTestStartMessage(message: TestStartMessage): void;
 
-  onTestStartMessage?(message: TestStartMessage): void;
+  onTestEndMessage(message: TestEndMessage): void;
 
-  onTestEndMessage?(message: TestEndMessage): void;
+  onTestErrorMessage(message: TestErrorMessage): void;
 
-  onTestErrorMessage?(message: TestErrorMessage): void;
+  onMeasureWarmupStartMessage(message: MeasureWarmupStartMessage): void;
 
-  onMeasureWarmupStartMessage?(message: MeasureWarmupStartMessage): void;
+  onMeasureWarmupEndMessage(message: MeasureWarmupEndMessage): void;
 
-  onMeasureWarmupEndMessage?(message: MeasureWarmupEndMessage): void;
+  onMeasureStartMessage(message: MeasureStartMessage): void;
 
-  onMeasureStartMessage?(message: MeasureStartMessage): void;
+  onMeasureEndMessage(message: MeasureEndMessage): void;
 
-  onMeasureEndMessage?(message: MeasureEndMessage): void;
+  onMeasureErrorMessage(message: MeasureErrorMessage): void;
 
-  onMeasureErrorMessage?(message: MeasureErrorMessage): void;
-
-  onMeasureProgressMessage?(message: MeasureProgressMessage): void;
+  onMeasureProgressMessage(message: MeasureProgressMessage): void;
 }
 
-export type Message =
-    | TestLifecycleInitMessage
+export interface WorkerMessageHandler {
+  onTestLifecycleInitMessage(message: TestLifecycleInitMessage): void;
+}
+
+export type MasterMessage =
     | TestStartMessage
     | TestEndMessage
     | TestErrorMessage
@@ -87,6 +88,9 @@ export type Message =
     | MeasureEndMessage
     | MeasureErrorMessage
     | MeasureProgressMessage;
+
+export type WorkerMessage =
+    | TestLifecycleInitMessage
 
 export const enum MessageType {
   TEST_LIFECYCLE_INIT,
@@ -109,7 +113,6 @@ export interface TestLifecycleInitMessage {
 
 export interface TestStartMessage {
   type: MessageType.TEST_START;
-  label: string;
 }
 
 export interface TestEndMessage {

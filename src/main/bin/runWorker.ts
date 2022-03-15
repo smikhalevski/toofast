@@ -1,32 +1,30 @@
 import fs from 'fs';
 import vm from 'vm';
 import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle';
-import {Message, MessageType} from './bin-types';
-import {createStats, extractMessage, handleMessage} from './utils';
+import {extractErrorMessage, extractStats, handleWorkerMessage} from './utils';
 import {measureLifecycle} from '../measureLifecycle';
 import {sleep} from '../utils';
-import {Histogram} from '../Histogram';
+import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
 
 /**
  * Runs worker that waits for test init message and sends lifecycle messages to parent process.
  */
 export function runWorker(): void {
 
-  const send: (message: Message) => void = process.send!;
+  const send: (message: MasterMessage) => void = process.send!;
 
   let prevPercent = -1;
 
-  const handlers: TestLifecycleHandlers<Histogram> = {
-    onTestStart(label) {
+  const handlers: TestLifecycleHandlers = {
+    onTestStart() {
       send({
         type: MessageType.TEST_START,
-        label,
       });
     },
     onTestEnd(histogram) {
       send({
         type: MessageType.TEST_END,
-        stats: createStats(histogram),
+        stats: extractStats(histogram),
       });
     },
     onMeasureWarmupStart() {
@@ -47,13 +45,13 @@ export function runWorker(): void {
     onMeasureEnd(histogram) {
       send({
         type: MessageType.MEASURE_END,
-        stats: createStats(histogram),
+        stats: extractStats(histogram),
       });
     },
     onMeasureError(error) {
       send({
         type: MessageType.MEASURE_ERROR,
-        message: extractMessage(error),
+        message: extractErrorMessage(error),
       });
     },
     onMeasureProgress(percent) {
@@ -71,7 +69,7 @@ export function runWorker(): void {
     },
   };
 
-  process.on('message', (message: Message) => handleMessage(message, {
+  process.on('message', (message: WorkerMessage) => handleWorkerMessage(message, {
 
     onTestLifecycleInitMessage(message) {
 
@@ -79,7 +77,7 @@ export function runWorker(): void {
 
       const lifecycle = createTestLifecycle(message.testPath, measureLifecycle, handlers);
 
-      const vmContext = vm.createContext(lifecycle.protocol);
+      const vmContext = vm.createContext(lifecycle.runtime);
 
       vm.runInContext(jsCode, vmContext);
 
@@ -87,9 +85,10 @@ export function runWorker(): void {
           .catch((error) => {
             send({
               type: MessageType.TEST_ERROR,
-              message: extractMessage(error),
+              message: extractErrorMessage(error),
             });
           })
+          // Ensure the message is sent
           .then(() => sleep(100))
           .then(() => {
             process.exit(0);

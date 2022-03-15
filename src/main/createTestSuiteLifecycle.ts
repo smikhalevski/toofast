@@ -1,27 +1,33 @@
-import {Protocol} from './test-types';
+import {Runtime} from './test-types';
 import {noop} from './utils';
+import {DescribeNode, NodeType, TestNode, TestSuiteNode} from './node-types';
 
 export interface TestSuiteLifecycleHandlers {
 
-  onDescribeDeclarationStart?(label: string): void;
+  onDescribeDeclarationStart(node: DescribeNode): void;
 
-  onDescribeDeclarationEnd?(): void;
+  onDescribeDeclarationEnd(node: DescribeNode): void;
 
-  onTestDeclarationStart?(label: string): void;
+  onTestDeclarationStart(node: TestNode): void;
 
-  onTestDeclarationEnd?(): void;
+  onTestDeclarationEnd(node: TestNode): void;
 
-  onDescribeStart?(label: string): void;
+  onDescribeStart(node: DescribeNode): void;
 
-  onDescribeEnd?(): void;
+  onDescribeEnd(node: DescribeNode): void;
 }
 
 export interface TestSuiteLifecycle {
 
   /**
+   * The tree of test and declaration DSL nodes.
+   */
+  node: TestSuiteNode;
+
+  /**
    * Functions that should be exposed in a test script.
    */
-  protocol: Protocol;
+  runtime: Runtime;
 
   /**
    * Starts the test suite lifecycle execution.
@@ -31,7 +37,7 @@ export interface TestSuiteLifecycle {
   run(): Promise<void>;
 }
 
-export function createTestSuiteLifecycle(testLifecycle: (testPath: number[]) => Promise<void>, handlers: TestSuiteLifecycleHandlers): TestSuiteLifecycle {
+export function createTestSuiteLifecycle(testLifecycle: (node: TestNode) => Promise<void>, handlers: TestSuiteLifecycleHandlers): TestSuiteLifecycle {
   const {
     onDescribeDeclarationStart,
     onDescribeDeclarationEnd,
@@ -46,10 +52,14 @@ export function createTestSuiteLifecycle(testLifecycle: (testPath: number[]) => 
     runLifecycle = resolve;
   });
 
-  const stack: number[] = [-1];
-  let i = 0;
+  const node: TestSuiteNode = {
+    nodeType: NodeType.TEST_SUITE,
+    children: [],
+  };
 
-  const protocol: Protocol = {
+  let parentNode: DescribeNode | TestSuiteNode = node;
+
+  const runtime: Runtime = {
 
     beforeEach: noop,
     afterEach: noop,
@@ -60,31 +70,45 @@ export function createTestSuiteLifecycle(testLifecycle: (testPath: number[]) => 
     afterIteration: noop,
 
     describe(label, cb) {
-      onDescribeDeclarationStart?.(label);
-      ++stack[i];
-      stack[++i] = -1;
+      const node: DescribeNode = {
+        nodeType: NodeType.DESCRIBE,
+        parentNode,
+        label,
+        children: [],
+      };
+      parentNode.children.push(node);
+      parentNode = node;
 
-      lifecyclePromise = lifecyclePromise.then(() => onDescribeStart?.(label));
+      onDescribeDeclarationStart(node);
+
+      lifecyclePromise = lifecyclePromise.then(() => onDescribeStart(node));
       cb();
-      lifecyclePromise = lifecyclePromise.then(onDescribeEnd);
+      lifecyclePromise = lifecyclePromise.then(() => onDescribeEnd(node));
 
-      --i;
-      onDescribeDeclarationEnd?.();
+      parentNode = node.parentNode;
+
+      onDescribeDeclarationEnd(node);
     },
 
     test(label) {
-      onTestDeclarationStart?.(label);
-      stack[i]++;
+      const node: TestNode = {
+        nodeType: NodeType.TEST,
+        parentNode,
+        label,
+      };
+      parentNode.children.push(node);
 
-      const testPath = stack.slice(0, i + 1);
-      lifecyclePromise = lifecyclePromise.then(() => testLifecycle(testPath));
+      onTestDeclarationStart(node);
 
-      onTestDeclarationEnd?.();
+      lifecyclePromise = lifecyclePromise.then(() => testLifecycle(node));
+
+      onTestDeclarationEnd(node);
     },
   };
 
   return {
-    protocol,
+    node,
+    runtime,
     run() {
       runLifecycle();
       return lifecyclePromise;

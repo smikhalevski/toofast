@@ -1,22 +1,22 @@
-import {Hook, MeasureOptions, SyncHook, Protocol, Measure, Test, Describe} from './test-types';
+import {Hook, MeasureOptions, SyncHook, Runtime, Measure, Test, Describe} from './test-types';
 import {Histogram} from './Histogram';
 import {measureLifecycle, MeasureLifecycleHandlers} from './measureLifecycle';
 
 export type MeasureLifecycle = typeof measureLifecycle;
 
-export interface TestLifecycleHandlers<Stats> extends MeasureLifecycleHandlers<Stats> {
+export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
 
   /**
    * Triggered before test is started.
    */
-  onTestStart?(): void;
+  onTestStart(): void;
 
   /**
    * Triggered when the test is completed. Not invoked if an error occurred in test lifecycle.
    *
-   * @param stats Tested callback performance statistics across all measurements.
+   * @param histogram Tested callback performance statistics across all measurements.
    */
-  onTestEnd?(stats: Stats): void;
+  onTestEnd(histogram: Histogram): void;
 }
 
 export interface TestLifecycle {
@@ -24,7 +24,7 @@ export interface TestLifecycle {
   /**
    * Functions that should be exposed in a test script.
    */
-  protocol: Protocol;
+  runtime: Runtime;
 
   /**
    * Starts the test lifecycle execution.
@@ -43,7 +43,7 @@ export interface TestLifecycle {
  *
  * @see {@link measureLifecycle}
  */
-export function createTestLifecycle(testPath: readonly number[], measureLifecycle: MeasureLifecycle, handlers: TestLifecycleHandlers<Histogram>): TestLifecycle {
+export function createTestLifecycle(testPath: readonly number[], measureLifecycle: MeasureLifecycle, handlers: TestLifecycleHandlers): TestLifecycle {
 
   const {
     onTestStart,
@@ -94,7 +94,7 @@ export function createTestLifecycle(testPath: readonly number[], measureLifecycl
 
     lifecyclePromise = lifecyclePromise.then(() => {
       testPending = true;
-      onTestStart?.();
+      onTestStart();
       return callHooks(beforeEachHooks);
     });
 
@@ -103,8 +103,12 @@ export function createTestLifecycle(testPath: readonly number[], measureLifecycl
       measureOptions.afterWarmup = () => callHooks(afterWarmupHooks);
       measureOptions.beforeBatch = () => callHooks(beforeBatchHooks);
       measureOptions.afterBatch = () => callHooks(afterBatchHooks);
-      measureOptions.beforeIteration = () => callSyncHooks(beforeIterationHooks);
-      measureOptions.afterIteration = () => callSyncHooks(afterIterationHooks);
+      measureOptions.beforeIteration = () => {
+        callSyncHooks(beforeIterationHooks);
+      };
+      measureOptions.afterIteration = () => {
+        callSyncHooks(afterIterationHooks);
+      };
 
       // Measure invocations forced to be sequential
       let measurePromise = Promise.resolve();
@@ -119,16 +123,14 @@ export function createTestLifecycle(testPath: readonly number[], measureLifecycl
       return Promise.resolve(cb(measure)).then(() => measurePromise);
     });
 
-    lifecyclePromise = lifecyclePromise.then(() => callHooks(afterEachHooks));
-
-    if (onTestEnd) {
-      lifecyclePromise = lifecyclePromise.then(() => {
-        onTestEnd(testHistogram);
-      });
-    }
+    lifecyclePromise = lifecyclePromise
+        .then(() => callHooks(afterEachHooks))
+        .then(() => {
+          onTestEnd(testHistogram);
+        });
   };
 
-  const protocol: Protocol = {
+  const runtime: Runtime = {
     beforeEach(hook) {
       beforeEachHooks.push(hook);
     },
@@ -155,7 +157,7 @@ export function createTestLifecycle(testPath: readonly number[], measureLifecycl
   };
 
   return {
-    protocol,
+    runtime,
     run() {
       runLifecycle();
       return lifecyclePromise;
@@ -163,7 +165,10 @@ export function createTestLifecycle(testPath: readonly number[], measureLifecycl
   };
 }
 
-function callHooks(hooks: Hook[]): Promise<void> {
+function callHooks(hooks: Hook[]): Promise<void> | void {
+  if (hooks.length === 0) {
+    return;
+  }
   let promise = Promise.resolve();
 
   for (const hook of hooks) {
