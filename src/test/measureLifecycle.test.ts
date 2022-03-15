@@ -1,13 +1,13 @@
-import {Histogram, measure, MeasureHandlers} from '../main';
+import {MeasureLifecycleHandlers, measureLifecycle} from '../main/measureLifecycle';
 
-describe('measure', () => {
+describe('measureLifecycle', () => {
 
   const onErrorMock = jest.fn();
   const onProgressMock = jest.fn();
 
-  const handlers: MeasureHandlers = {
-    onError: onErrorMock,
-    onProgress: onProgressMock,
+  const handlers: MeasureLifecycleHandlers = {
+    onMeasureError: onErrorMock,
+    onMeasureProgress: onProgressMock,
   };
 
   beforeEach(() => {
@@ -16,13 +16,13 @@ describe('measure', () => {
   });
 
   test('returns a Promise', () => {
-    expect(measure(() => undefined, new Histogram(), handlers, {})).toBeInstanceOf(Promise);
+    expect(measureLifecycle(() => undefined, handlers, {measureTimeout: -1})).toBeInstanceOf(Promise);
   });
 
   test('invokes a callback', async () => {
     const cbMock = jest.fn();
 
-    await measure(cbMock, new Histogram(), handlers, {warmupIterationCount: 0, measureTimeout: -1});
+    await measureLifecycle(cbMock, handlers, {warmupIterationCount: 0, measureTimeout: -1});
 
     expect(cbMock).toHaveBeenCalledTimes(1);
   });
@@ -30,7 +30,7 @@ describe('measure', () => {
   test('invokes afterWarmup callback', async () => {
     const afterWarmupMock = jest.fn();
 
-    await measure(() => undefined, new Histogram(), handlers, {
+    await measureLifecycle(() => undefined, handlers, {
       warmupIterationCount: 1,
       measureTimeout: -1,
       afterWarmup: afterWarmupMock,
@@ -44,7 +44,7 @@ describe('measure', () => {
     const beforeIterationMock = jest.fn();
     const afterIterationMock = jest.fn();
 
-    measure(cbMock, new Histogram(), handlers, {
+    measureLifecycle(cbMock, handlers, {
       warmupIterationCount: 10,
       measureTimeout: -1,
 
@@ -62,7 +62,7 @@ describe('measure', () => {
   test('does not invoke afterWarmup callback', async () => {
     const afterWarmupMock = jest.fn();
 
-    await measure(() => undefined, new Histogram(), handlers, {
+    await measureLifecycle(() => undefined, handlers, {
       warmupIterationCount: 0,
       measureTimeout: -1,
       afterWarmup: afterWarmupMock
@@ -72,19 +72,19 @@ describe('measure', () => {
   });
 
   test('triggers onError', async () => {
-    await measure(() => {
+    await measureLifecycle(() => {
       throw new Error();
-    }, new Histogram(), handlers, {measureTimeout: -1});
+    }, handlers, {measureTimeout: -1});
 
-    expect(handlers.onError).toHaveBeenCalled();
+    expect(handlers.onMeasureError).toHaveBeenCalled();
   });
 
   test('triggers onProgress', async () => {
-    await measure(() => undefined, new Histogram(), handlers, {measureTimeout: -1});
+    await measureLifecycle(() => undefined, handlers, {measureTimeout: -1});
 
-    expect(handlers.onProgress).toHaveBeenCalledTimes(2);
-    expect(handlers.onProgress).toHaveBeenNthCalledWith(1, 0);
-    expect(handlers.onProgress).toHaveBeenNthCalledWith(2, 1);
+    expect(handlers.onMeasureProgress).toHaveBeenCalledTimes(2);
+    expect(handlers.onMeasureProgress).toHaveBeenNthCalledWith(1, 0);
+    expect(handlers.onMeasureProgress).toHaveBeenNthCalledWith(2, 1);
   });
 
   test('runs measurements in batches', async () => {
@@ -93,11 +93,10 @@ describe('measure', () => {
     const beforeIterationMock = jest.fn();
     const afterIterationMock = jest.fn();
 
-    const histogram = new Histogram();
-
-    await measure(() => undefined, histogram, handlers, {
+    const histogram = await measureLifecycle(() => undefined, handlers, {
+      measureTimeout: 100,
       warmupIterationCount: 0,
-      measureTimeout: 50,
+      batchIntermissionTimeout: 0,
       batchTimeout: 10,
       beforeBatch: beforeBatchMock,
       afterBatch: afterBatchMock,
@@ -106,8 +105,8 @@ describe('measure', () => {
     });
 
     expect(histogram.size).toBeGreaterThan(500);
-    expect(beforeBatchMock.mock.calls.length).toBeGreaterThan(2);
-    expect(afterBatchMock.mock.calls.length).toBeGreaterThan(beforeBatchMock.mock.calls.length);
+    expect(beforeBatchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(afterBatchMock.mock.calls.length).toBe(beforeBatchMock.mock.calls.length);
     expect(beforeIterationMock).toHaveBeenCalledTimes(histogram.size);
     expect(afterIterationMock).toHaveBeenCalledTimes(histogram.size);
   });

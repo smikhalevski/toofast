@@ -1,23 +1,23 @@
-import {Awaitable} from 'parallel-universe';
+export type Hook = () => PromiseLike<void> | void;
 
-export type Hook = () => Awaitable<void>;
-
-export type MountHook = (cb: Hook) => void;
+export type MountHook = (hook: Hook) => void;
 
 export type SyncHook = () => void;
 
-export type MountSyncHook = (cb: SyncHook) => void;
+export type MountSyncHook = (hook: SyncHook) => void;
 
-export type Describe = (label: string, cb: () => Awaitable<void>, options?: TestOptions) => void;
+export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
 
-export type Test = (label: string, cb: (measure: (cb: () => unknown) => Promise<void>) => Awaitable<void>, options?: TestOptions) => void;
+export type Measure = (cb: () => unknown) => Promise<void>;
+
+export type Test = (label: string, cb: (measure: Measure) => PromiseLike<void> | void, options?: TestOptions) => void;
 
 export interface TestOptions {
 
   /**
    * Maximum measure duration. Doesn't include the duration of warmup iterations.
    *
-   * @default 5000
+   * @default 10_000
    */
   measureTimeout?: number;
 
@@ -43,11 +43,18 @@ export interface TestOptions {
   batchIterationCount?: number;
 
   /**
-   * The maximum batch duration.
+   * The maximum duration of batched measurements.
    *
    * @default 1_000
    */
   batchTimeout?: number;
+
+  /**
+   * The delay between batched measurements. VM is expected to run garbage collector during this delay.
+   * 
+   * @default 200
+   */
+  batchIntermissionTimeout?: number;
 }
 
 export interface MeasureOptions extends TestOptions {
@@ -58,7 +65,10 @@ export interface MeasureOptions extends TestOptions {
   afterIteration?: SyncHook;
 }
 
-export interface TestProtocol {
+/**
+ * Functions that are exposed in a test script.
+ */
+export interface Protocol {
   beforeEach: MountHook;
   afterEach: MountHook;
   afterWarmup: MountHook;

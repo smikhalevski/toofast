@@ -1,4 +1,4 @@
-import {createWorkerProtocol, WorkerHandlers} from '../main';
+import {createTestLifecycle, TestLifecycleHandlers} from '../main';
 
 describe('createWorkerProtocol', () => {
 
@@ -7,10 +7,10 @@ describe('createWorkerProtocol', () => {
   const onProgressMock = jest.fn();
   const onTestCompleteMock = jest.fn();
 
-  const handlers: WorkerHandlers = {
-    onError: onErrorMock,
-    onProgress: onProgressMock,
-    onTestComplete: onTestCompleteMock,
+  const handlers: TestLifecycleHandlers = {
+    onMeasureError: onErrorMock,
+    onMeasureProgress: onProgressMock,
+    onTestEnd: onTestCompleteMock,
   };
 
   beforeEach(() => {
@@ -24,7 +24,7 @@ describe('createWorkerProtocol', () => {
 
     const testedCb = () => undefined;
 
-    const protocol = createWorkerProtocol(handlers, {testPath: [1, 1, 1], runMeasure: runMeasureMock});
+    const protocol = createTestLifecycle(handlers, {testPath: [1, 1, 1], runMeasure: runMeasureMock});
 
     const t = protocol.testProtocol;
 

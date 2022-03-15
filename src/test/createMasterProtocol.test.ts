@@ -1,4 +1,4 @@
-import {createMasterProtocol, DescribeNode, MasterHandlers, NodeType, TestNode, TestSuiteNode} from '../main';
+import {createTestSuiteLifecycle, DescribeNode, TestSuiteLifecycleHandlers, NodeType, TestNode, TestSuiteNode} from '../main';
 
 describe('createMasterProtocol', () => {
 
@@ -8,11 +8,11 @@ describe('createMasterProtocol', () => {
   const onTestStartMock = jest.fn();
   const onTestEndMock = jest.fn();
 
-  const handlers: MasterHandlers = {
-    onDescribeStart: onDescribeStartMock,
-    onDescribeEnd: onDescribeEndMock,
-    onTestStart: onTestStartMock,
-    onTestEnd: onTestEndMock,
+  const handlers: TestSuiteLifecycleHandlers = {
+    onDescribeDeclarationStart: onDescribeStartMock,
+    onDescribeDeclarationEnd: onDescribeEndMock,
+    onTestDeclarationStart: onTestStartMock,
+    onTestDeclarationEnd: onTestEndMock,
   };
 
   beforeEach(() => {
@@ -24,7 +24,7 @@ describe('createMasterProtocol', () => {
   });
 
   test('assembles nodes', () => {
-    const protocol = createMasterProtocol(handlers, {runTest: runTestMock});
+    const protocol = createTestSuiteLifecycle(handlers, {runTest: runTestMock});
 
     const t = protocol.testProtocol;
 
@@ -132,7 +132,7 @@ describe('createMasterProtocol', () => {
 
   test('runs the protocol', async () => {
 
-    const protocol = createMasterProtocol(handlers, {runTest: runTestMock});
+    const protocol = createTestSuiteLifecycle(handlers, {runTest: runTestMock});
 
     const t = protocol.testProtocol;
 
