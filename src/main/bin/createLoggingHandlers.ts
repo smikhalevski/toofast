@@ -13,10 +13,17 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
   let depth = 0;
   let testLabel: string;
   let errorMessage: string | undefined;
+  let measurementCount = 0;
 
   const numberFormat = new Intl.NumberFormat('en', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+    useGrouping: true,
+  });
+
+  const integerFormat = new Intl.NumberFormat('en', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
     useGrouping: true,
   });
 
@@ -60,6 +67,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
         errorMessage = undefined;
       }
       testLabel = node.label.padEnd(getLabelLength(node));
+      measurementCount = 0;
 
       if (node.parentNode.children[node.parentNode.children.indexOf(node) - 1]?.nodeType === NodeType.DESCRIBE) {
         write('\n');
@@ -109,7 +117,9 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
     onMeasureStart(node) {
     },
+
     onMeasureEnd(node, stats) {
+      ++measurementCount;
     },
 
     onMeasureError(node, error) {
@@ -124,6 +134,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           + testLabel
           + PADDING
           + percentFormat.format(percent).padStart(4)
+          + (measurementCount !== 0 ? dim(' (' + integerFormat.format(measurementCount + 1) + ')') : '')
       );
     },
   };

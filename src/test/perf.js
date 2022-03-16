@@ -20,7 +20,7 @@ describe('describe 0', () => {
 
   describe('describe 0.1', () => {
 
-    test('test 0.1.0', (measure) => {
+    test('test 0.1.0 (throws error)', (measure) => {
       measure(() => {
         throw new Error('Expected error');
       });
@@ -33,13 +33,18 @@ describe('describe 0', () => {
 
   describe('describe 0.2', () => {
 
-    test('test 0.2.0', () => {
+    test('test 0.2.0 (stack overflow)', () => {
       const stackOverflow = () => stackOverflow();
       stackOverflow();
     });
 
-    test('test 0.2.1', (measure) => {
-      measure(() => 'a' + 'b');
+    test('test 0.2.1 (multiple measurements)', (measure) => {
+
+      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
+
+      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
+
+      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
     });
   });
 
