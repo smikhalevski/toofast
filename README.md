@@ -1,54 +1,37 @@
-# perf-test
+# TooFast
 
-The Node.js performance testing tool.
+The Node.js performance testing tool with unit-test-like API.
 
 ```shell
-npm install --save-dev @smikhalevski/perf-test
+npm install --save-dev toofast
 ```
 
-⚠️ [API documentation is available here.](https://smikhalevski.github.io/perf-test/)
+[API documentation is available here.](https://smikhalevski.github.io/toofast/)
 
 ## Usage
 
-Measure performance of a callback:
+```ts
+// ./myPerfTest.js
+import {myFunction} from './myModule';
 
-```js
-const {test} = require('@smikhalevski/perf-test');
+describe('myFunction', () => {
 
-function callback() {
-  // The code you want to test goes here
-}
+  test('with one string arg', (measure) => {
+    measure(() => {
+      myFunction('abc');
+    });
+  });
 
-test('My test', callback, {testTimeout: 3000});
-// stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
+  test('with string and number args', (measure) => {
+    measure(() => {
+      myFunction('abc', 123);
+    });
+  });
+})
 ```
 
-Measure performance of a callback across a population of values:
+To run tests:
 
-```js
-const {valueTest} = require('@smikhalevski/perf-test');
-
-function callback(value) {
-  // value is 1, 2 or 3 
-  // The code you want to test goes here
-}
-
-valueTest([1, 2, 3], 'My test', callback, {testTimeout: 3000});
-// stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
-```
-
-Get programmatic access to the test result statistics:
-
-```js
-const {createHistogram, cycle} = require('@smikhalevski/perf-test');
-
-function callback() {
-  // The code you want to test goes here
-}
-
-const histogram = createHistogram();
-
-cycle(callback, histogram, {testTimeout: 3000});
-
-histogram.getHz(); // → 7331041.16
+```shell
+toofast ./myPerfTest.js
 ```
