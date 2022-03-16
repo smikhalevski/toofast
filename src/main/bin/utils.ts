@@ -1,65 +1,66 @@
 import {
   MasterMessage,
-  MasterMessageHandler,
+  MasterMessageHandlers,
   MessageType,
   Stats,
   WorkerMessage,
-  WorkerMessageHandler
+  WorkerMessageHandlers
 } from './bin-types';
 import {Histogram} from '../Histogram';
-import {NodeType, TestNode} from '../node-types';
+import {DescribeNode, NodeType, TestNode} from '../node-types';
+import {type} from 'typedoc/dist/lib/output/themes/default/partials/type';
 
-export function handleMasterMessage(message: MasterMessage, handler: MasterMessageHandler): true {
+export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {
 
     case MessageType.TEST_START:
-      handler.onTestStartMessage(message);
+      handlers.onTestStartMessage(message);
       return true;
 
     case MessageType.TEST_END:
-      handler.onTestEndMessage(message);
+      handlers.onTestEndMessage(message);
       return true;
 
-    case MessageType.TEST_ERROR:
-      handler.onTestErrorMessage(message);
+    case MessageType.TEST_FATAL_ERROR:
+      handlers.onTestFatalErrorMessage(message);
       return true;
 
     case MessageType.MEASURE_WARMUP_START:
-      handler.onMeasureWarmupStartMessage(message);
+      handlers.onMeasureWarmupStartMessage(message);
       return true;
 
     case MessageType.MEASURE_WARMUP_END:
-      handler.onMeasureWarmupEndMessage(message);
+      handlers.onMeasureWarmupEndMessage(message);
       return true;
 
     case MessageType.MEASURE_START:
-      handler.onMeasureStartMessage(message);
+      handlers.onMeasureStartMessage(message);
       return true;
 
     case MessageType.MEASURE_END:
-      handler.onMeasureEndMessage(message);
+      handlers.onMeasureEndMessage(message);
       return true;
 
     case MessageType.MEASURE_ERROR:
-      handler.onMeasureErrorMessage(message);
+      handlers.onMeasureErrorMessage(message);
       return true;
 
     case MessageType.MEASURE_PROGRESS:
-      handler.onMeasureProgressMessage(message);
+      handlers.onMeasureProgressMessage(message);
       return true;
   }
 }
 
-export function handleWorkerMessage(message: WorkerMessage, handler: WorkerMessageHandler): true {
+export function handleMasterMessage(message: MasterMessage, handlers: MasterMessageHandlers): true {
   switch (message.type) {
 
     case MessageType.TEST_LIFECYCLE_INIT:
-      handler.onTestLifecycleInitMessage(message);
+      handlers.onTestLifecycleInitMessage(message);
       return true;
   }
 }
 
-export function extractStats(histogram: Histogram): Stats {
+export function getStats(histogram: Histogram): Stats {
   return {
     size: histogram.size,
     mean: histogram.getMean(),
@@ -72,11 +73,11 @@ export function extractStats(histogram: Histogram): Stats {
   };
 }
 
-export function extractErrorMessage(error: any): string {
-  return error instanceof Error ? error.stack || error.message : String(error);
+export function getErrorMessage(error: any): string {
+  return typeof error?.message === 'string' ? error.stack || error.message : String(error);
 }
 
-export function extractTestPath(node: TestNode): number[] {
+export function getTestPath(node: DescribeNode | TestNode): number[] {
   const testPath: number[] = [];
 
   let parentNode = node.parentNode;
@@ -86,7 +87,27 @@ export function extractTestPath(node: TestNode): number[] {
     if (parentNode.nodeType === NodeType.TEST_SUITE) {
       break;
     }
+    node = parentNode;
     parentNode = parentNode.parentNode;
   }
   return testPath;
+}
+
+export function getLabelLength(node: TestNode): number {
+  const siblings = node.parentNode.children;
+
+  let i = siblings.indexOf(node);
+
+  while (i !== 0 && siblings[i - 1].nodeType === NodeType.TEST) {
+    --i;
+  }
+
+  let length = 0;
+
+  while (i < siblings.length && siblings[i].nodeType === NodeType.TEST) {
+    length = Math.max(length, siblings[i].label.length);
+    ++i;
+  }
+
+  return length;
 }

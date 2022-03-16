@@ -1,9 +1,8 @@
 import fs from 'fs';
 import vm from 'vm';
 import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle';
-import {extractErrorMessage, extractStats, handleWorkerMessage} from './utils';
-import {measureLifecycle} from '../measureLifecycle';
-import {sleep} from '../utils';
+import {getErrorMessage, getStats, handleMasterMessage} from './utils';
+import {runMeasureLifecycle} from '../runMeasureLifecycle';
 import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
 
 /**
@@ -11,9 +10,10 @@ import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
  */
 export function runWorker(): void {
 
-  const send: (message: MasterMessage) => void = process.send!;
+  const send: (message: WorkerMessage) => void = (message) => process.send!(message);
 
-  let prevPercent = -1;
+  let prevPercent: number;
+  let prevErrorMessage: string;
 
   const handlers: TestLifecycleHandlers = {
     onTestStart() {
@@ -24,7 +24,7 @@ export function runWorker(): void {
     onTestEnd(histogram) {
       send({
         type: MessageType.TEST_END,
-        stats: extractStats(histogram),
+        stats: getStats(histogram),
       });
     },
     onMeasureWarmupStart() {
@@ -45,37 +45,36 @@ export function runWorker(): void {
     onMeasureEnd(histogram) {
       send({
         type: MessageType.MEASURE_END,
-        stats: extractStats(histogram),
+        stats: getStats(histogram),
       });
     },
     onMeasureError(error) {
-      send({
-        type: MessageType.MEASURE_ERROR,
-        message: extractErrorMessage(error),
-      });
+      const errorMessage = getErrorMessage(error);
+      if (prevErrorMessage !== errorMessage) {
+        send({
+          type: MessageType.MEASURE_ERROR,
+          message: prevErrorMessage = errorMessage,
+        });
+      }
     },
     onMeasureProgress(percent) {
       const nextPercent = Math.round(percent * 100) / 100;
-
-      if (prevPercent === nextPercent) {
-        return;
+      if (prevPercent !== nextPercent) {
+        send({
+          type: MessageType.MEASURE_PROGRESS,
+          percent: prevPercent = nextPercent,
+        });
       }
-      prevPercent = nextPercent;
-
-      send({
-        type: MessageType.MEASURE_PROGRESS,
-        percent: nextPercent,
-      });
     },
   };
 
-  process.on('message', (message: WorkerMessage) => handleWorkerMessage(message, {
+  process.on('message', (message: MasterMessage) => handleMasterMessage(message, {
 
     onTestLifecycleInitMessage(message) {
 
       const jsCode = fs.readFileSync(message.filePath, 'utf-8');
 
-      const lifecycle = createTestLifecycle(message.testPath, measureLifecycle, handlers);
+      const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers);
 
       const vmContext = vm.createContext(lifecycle.runtime);
 
@@ -84,12 +83,10 @@ export function runWorker(): void {
       lifecycle.run()
           .catch((error) => {
             send({
-              type: MessageType.TEST_ERROR,
-              message: extractErrorMessage(error),
+              type: MessageType.TEST_FATAL_ERROR,
+              message: getErrorMessage(error),
             });
           })
-          // Ensure the message is sent
-          .then(() => sleep(100))
           .then(() => {
             process.exit(0);
           });

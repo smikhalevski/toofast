@@ -1,7 +1,12 @@
-import {MasterLifecycleHandlers} from './runMaster';
 import {bold, dim, green, red} from 'kleur/colors';
-import {extractErrorMessage} from './utils';
-import {NodeType, TestNode} from '../node-types';
+import {getErrorMessage, getLabelLength} from './utils';
+import {MasterLifecycleHandlers} from './bin-types';
+import {NodeType} from '../node-types';
+
+const PADDING = '  ';
+const PENDING = dim('○ ');
+const FAILURE = red('● ');
+const SUCCESS = green('● ');
 
 export function createLoggingHandlers(): MasterLifecycleHandlers {
 
@@ -15,6 +20,12 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     useGrouping: true,
   });
 
+  const rmeFormat = new Intl.NumberFormat('en', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+    style: 'percent',
+  });
+
   const percentFormat = new Intl.NumberFormat('en', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
@@ -22,101 +33,100 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
   });
 
   return {
-    onDescribeDeclarationStart(node) {
-      // noop
-    },
-    onDescribeDeclarationEnd(node) {
-      // noop
-    },
-    onTestDeclarationStart(node) {
-      // noop
-    },
-    onTestDeclarationEnd(node) {
-      // noop
-    },
+
     onDescribeStart(node) {
       if (errorMessage) {
         write('\n\n');
         errorMessage = undefined;
       }
-      write('  '.repeat(depth) + bold(node.label) + '\n');
+      if (node.parentNode.nodeType !== NodeType.TEST_SUITE || node.parentNode.children[0] !== node) {
+        write('\n');
+      }
+      write(
+          PADDING.repeat(depth)
+          + bold(node.label)
+          + '\n'
+      );
       ++depth;
     },
+
     onDescribeEnd(node) {
       --depth;
     },
+
     onTestStart(node) {
       if (errorMessage) {
         write('\n\n');
         errorMessage = undefined;
       }
-      testLabel = node.label.padEnd(fitLabelLength(node));
-      write('\r' + '  '.repeat(depth) + dim('→ ') + testLabel);
+      testLabel = node.label.padEnd(getLabelLength(node));
+
+      if (node.parentNode.children[node.parentNode.children.indexOf(node) - 1]?.nodeType === NodeType.DESCRIBE) {
+        write('\n');
+      }
+      write(
+          '\r'
+          + PADDING.repeat(depth)
+          + PENDING
+          + testLabel
+          + PADDING
+      );
     },
+
     onTestEnd(node, stats) {
       write(
           '\r'
-          + '  '.repeat(depth)
-          + (errorMessage ? red(bold('• ')) : green(bold('• ')))
+          + PADDING.repeat(depth)
+          + (errorMessage ? FAILURE : SUCCESS)
           + testLabel
-          + '  '
+          + PADDING
           + numberFormat.format(stats.hz)
-          + dim(' ops/sec ± ' + numberFormat.format(stats.variance))
+          + dim(' ops/sec ± ' + rmeFormat.format(stats.rme))
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
     },
-    onTestError(node, error) {
-      errorMessage = extractErrorMessage(error);
-      write(red(errorMessage));
+
+    onTestFatalError(node, error) {
+      errorMessage = getErrorMessage(error);
+      write(
+          '\r'
+          + PADDING.repeat(depth)
+          + FAILURE
+          + testLabel
+          + '\n'
+          + red(errorMessage)
+      );
     },
+
     onTestSuiteError(node, error) {
-      write('\n\n' + red(extractErrorMessage(error)));
+      write('\n\n' + red(getErrorMessage(error)));
     },
+
     onMeasureWarmupStart(node) {
-      // noop
     },
     onMeasureWarmupEnd(node) {
-      // noop
     },
     onMeasureStart(node) {
-      // noop
     },
     onMeasureEnd(node, stats) {
-      // noop
     },
+
     onMeasureError(node, error) {
-      errorMessage ||= extractErrorMessage(error);
+      errorMessage ||= getErrorMessage(error);
     },
+
     onMeasureProgress(node, percent) {
       write(
           '\r'
-          + '  '.repeat(depth)
-          + '  '
+          + PADDING.repeat(depth)
+          + PENDING
           + testLabel
-          + '  '
-          + percentFormat.format(percent).padStart(5)
+          + PADDING
+          + percentFormat.format(percent).padStart(4)
       );
     },
   };
-}
-
-function fitLabelLength(node: TestNode): number {
-  const siblings = node.parentNode.children;
-
-  let i = siblings.indexOf(node);
-
-  while (i !== 0 && siblings[i - 1].nodeType === NodeType.TEST) {
-    i--;
-  }
-
-  let length = 0;
-
-  while (i < siblings.length && siblings[i].nodeType === NodeType.TEST) {
-    length = Math.max(length, siblings[i].label.length);
-  }
-
-  return length;
 }
 
 function write(message: string): void {

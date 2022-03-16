@@ -4,18 +4,10 @@ describe('createTestSuiteLifecycle', () => {
 
   const testLifecycleMock = jest.fn(() => Promise.resolve());
 
-  const onDescribeDeclarationStartMock = jest.fn();
-  const onDescribeDeclarationEndMock = jest.fn();
-  const onTestDeclarationStartMock = jest.fn();
-  const onTestDeclarationEndMock = jest.fn();
   const onDescribeStartMock = jest.fn();
   const onDescribeEndMock = jest.fn();
 
   const handlers: TestSuiteLifecycleHandlers = {
-    onDescribeDeclarationStart: onDescribeDeclarationStartMock,
-    onDescribeDeclarationEnd: onDescribeDeclarationEndMock,
-    onTestDeclarationStart: onTestDeclarationStartMock,
-    onTestDeclarationEnd: onTestDeclarationEndMock,
     onDescribeStart: onDescribeStartMock,
     onDescribeEnd: onDescribeEndMock,
   };
@@ -23,10 +15,6 @@ describe('createTestSuiteLifecycle', () => {
   beforeEach(() => {
     testLifecycleMock.mockClear();
 
-    onDescribeDeclarationStartMock.mockClear();
-    onDescribeDeclarationEndMock.mockClear();
-    onTestDeclarationStartMock.mockClear();
-    onTestDeclarationEndMock.mockClear();
     onDescribeStartMock.mockClear();
     onDescribeEndMock.mockClear();
   });
@@ -150,10 +138,6 @@ describe('createTestSuiteLifecycle', () => {
     expect(testLifecycleMock).toHaveBeenNthCalledWith(1, (lifecycle.node.children[0] as DescribeNode).children[0]);
     expect(testLifecycleMock).toHaveBeenNthCalledWith(2, lifecycle.node.children[1]);
 
-    expect(onDescribeDeclarationStartMock).toHaveBeenCalledTimes(1);
-    expect(onDescribeDeclarationEndMock).toHaveBeenCalledTimes(1);
-    expect(onTestDeclarationStartMock).toHaveBeenCalledTimes(2);
-    expect(onTestDeclarationEndMock).toHaveBeenCalledTimes(2);
     expect(onDescribeStartMock).toHaveBeenCalledTimes(1);
     expect(onDescribeEndMock).toHaveBeenCalledTimes(1);
   });

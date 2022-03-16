@@ -1,48 +1,25 @@
-import {createTestSuiteLifecycle, TestSuiteLifecycleHandlers} from '../createTestSuiteLifecycle';
-import {MasterMessage, MessageType, Stats, TestLifecycleInitMessage} from './bin-types';
+import {createTestSuiteLifecycle} from '../createTestSuiteLifecycle';
+import {MasterLifecycleHandlers, WorkerMessage, MessageType, TestLifecycleInitMessage} from './bin-types';
 import path from 'path';
 import fs from 'fs';
 import cluster from 'cluster';
 import vm from 'vm';
-import {extractTestPath, handleMasterMessage} from './utils';
-import {TestNode, TestSuiteNode} from '../node-types';
-
-export interface MasterLifecycleHandlers extends TestSuiteLifecycleHandlers {
-
-  onTestStart(node: TestNode): void;
-
-  onTestEnd(node: TestNode, stats: Stats): void;
-
-  onTestError(node: TestNode, error: any): void;
-
-  onTestSuiteError(node: TestSuiteNode, error: any): void;
-
-  onMeasureWarmupStart(node: TestNode): void;
-
-  onMeasureWarmupEnd(node: TestNode): void;
-
-  onMeasureStart(node: TestNode): void;
-
-  onMeasureEnd(node: TestNode, stats: Stats): void;
-
-  onMeasureError(node: TestNode, error: any): void;
-
-  onMeasureProgress(node: TestNode, percent: number): void;
-}
+import {getTestPath, handleWorkerMessage} from './utils';
+import {TestNode} from '../node-types';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
   let testNode: TestNode;
 
-  const handleWorkerMessage = (message: MasterMessage) => handleMasterMessage(message, {
+  const handleMessage = (message: WorkerMessage) => handleWorkerMessage(message, {
     onTestStartMessage() {
       handlers.onTestStart(testNode);
     },
     onTestEndMessage(message) {
       handlers.onTestEnd(testNode, message.stats);
     },
-    onTestErrorMessage(message) {
-      handlers.onTestError(testNode, message.message);
+    onTestFatalErrorMessage(message) {
+      handlers.onTestFatalError(testNode, message.message);
     },
     onMeasureWarmupStartMessage() {
       handlers.onMeasureWarmupStart(testNode);
@@ -73,17 +50,17 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
 
     const worker = cluster.fork();
 
-    worker.on('message', handleWorkerMessage);
+    worker.on('message', handleMessage);
     worker.on('exit', resolve);
     worker.on('error', (error) => {
-      handlers.onTestError(testNode, error);
+      handlers.onTestFatalError(testNode, error);
       resolve();
     });
 
     const message: TestLifecycleInitMessage = {
       type: MessageType.TEST_LIFECYCLE_INIT,
       filePath,
-      testPath: extractTestPath(node),
+      testPath: getTestPath(node),
     };
 
     worker.send(message);

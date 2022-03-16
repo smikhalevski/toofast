@@ -1,3 +1,5 @@
+import {DescribeNode, TestNode, TestSuiteNode} from '../node-types';
+
 /**
  * Population statistics passed between master and fork processes.
  */
@@ -53,13 +55,43 @@ export interface Stats {
   hz: number;
 }
 
-export interface MasterMessageHandler {
+export interface MasterLifecycleHandlers {
+
+  onDescribeStart(node: DescribeNode): void;
+
+  onDescribeEnd(node: DescribeNode): void;
+
+  onTestStart(node: TestNode): void;
+
+  onTestEnd(node: TestNode, stats: Stats): void;
+
+  onTestFatalError(node: TestNode, error: any): void;
+
+  onTestSuiteError(node: TestSuiteNode, error: any): void;
+
+  onMeasureWarmupStart(node: TestNode): void;
+
+  onMeasureWarmupEnd(node: TestNode): void;
+
+  onMeasureStart(node: TestNode): void;
+
+  onMeasureEnd(node: TestNode, stats: Stats): void;
+
+  onMeasureError(node: TestNode, error: any): void;
+
+  onMeasureProgress(node: TestNode, percent: number): void;
+}
+
+/**
+ * Handles messages sent from the worker to the master.
+ */
+export interface WorkerMessageHandlers {
 
   onTestStartMessage(message: TestStartMessage): void;
 
   onTestEndMessage(message: TestEndMessage): void;
 
-  onTestErrorMessage(message: TestErrorMessage): void;
+  onTestFatalErrorMessage(message: TestFatalErrorMessage): void;
 
   onMeasureWarmupStartMessage(message: MeasureWarmupStartMessage): void;
 
@@ -74,14 +106,18 @@ export interface MasterMessageHandler {
   onMeasureProgressMessage(message: MeasureProgressMessage): void;
 }
 
-export interface WorkerMessageHandler {
+/**
+ * Handles messages sent from the master to the worker.
+ */
+export interface MasterMessageHandlers {
+
   onTestLifecycleInitMessage(message: TestLifecycleInitMessage): void;
 }
 
-export type MasterMessage =
+export type WorkerMessage =
     | TestStartMessage
     | TestEndMessage
-    | TestErrorMessage
+    | TestFatalErrorMessage
     | MeasureWarmupStartMessage
     | MeasureWarmupEndMessage
     | MeasureStartMessage
@@ -89,20 +125,20 @@ export type MasterMessage =
     | MeasureErrorMessage
     | MeasureProgressMessage;
 
-export type WorkerMessage =
+export type MasterMessage =
     | TestLifecycleInitMessage
 
 export const enum MessageType {
-  TEST_LIFECYCLE_INIT,
-  TEST_START,
-  TEST_END,
-  TEST_ERROR,
-  MEASURE_WARMUP_START,
-  MEASURE_WARMUP_END,
-  MEASURE_START,
-  MEASURE_END,
-  MEASURE_ERROR,
-  MEASURE_PROGRESS,
+   TEST_LIFECYCLE_INIT = 'testLifecycleInit',
+   TEST_START = 'testStart',
+   TEST_END = 'testEnd',
+   TEST_FATAL_ERROR = 'testFatalError',
+   MEASURE_WARMUP_START = 'measureWarmupStart',
+   MEASURE_WARMUP_END = 'measureWarmupEnd',
+   MEASURE_START = 'measureStart',
+   MEASURE_END = 'measureEnd',
+   MEASURE_ERROR = 'measureError',
+   MEASURE_PROGRESS = 'measureProgress',
 }
 
 export interface TestLifecycleInitMessage {
@@ -120,8 +156,8 @@ export interface TestEndMessage {
   stats: Stats;
 }
 
-export interface TestErrorMessage {
-  type: MessageType.TEST_ERROR;
+export interface TestFatalErrorMessage {
+  type: MessageType.TEST_FATAL_ERROR;
   message: string;
 }
 

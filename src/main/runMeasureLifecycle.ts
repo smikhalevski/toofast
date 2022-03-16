@@ -7,38 +7,38 @@ export interface MeasureLifecycleHandlers {
   /**
    * Triggered before the warmup is started. If {@link MeasureOptions.warmupIterationCount} is 0 then there's no warmup.
    */
-  onMeasureWarmupStart(): void;
+  onMeasureWarmupStart?(): void;
 
   /**
    * Triggered after the warmup was completed.
    */
-  onMeasureWarmupEnd(): void;
+  onMeasureWarmupEnd?(): void;
 
   /**
    * Triggered before performance measurements are collected.
    */
-  onMeasureStart(): void;
+  onMeasureStart?(): void;
 
   /**
    * Triggered after measurements were collected.
    *
    * @param histogram Tested callback performance statistics.
    */
-  onMeasureEnd(histogram: Histogram): void;
+  onMeasureEnd?(histogram: Histogram): void;
 
   /**
    * Triggered when an error occurred during the measured callback invocation.
    *
    * @param error The error that was thrown.
    */
-  onMeasureError(error: any): void;
+  onMeasureError?(error: any): void;
 
   /**
    * Triggered after each iteration with the elapsed percentage of the measurement duration.
    *
    * @param percent The elapsed percentage of the measurement duration.
    */
-  onMeasureProgress(percent: number): void;
+  onMeasureProgress?(percent: number): void;
 }
 
 /**
@@ -50,7 +50,7 @@ export interface MeasureLifecycleHandlers {
  * @param histogram The histogram to store performance measurements.
  * @returns The promise that is resolved with the results' histogram when measurements are completed.
  */
-export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHandlers, options: MeasureOptions, histogram = new Histogram()): Promise<Histogram> {
+export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHandlers = {}, options: MeasureOptions = {}, histogram = new Histogram()): Promise<Histogram> {
 
   const {
     onMeasureStart,
@@ -63,7 +63,7 @@ export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHa
 
   const {
     measureTimeout = 10_000,
-    targetRme = 0.002,
+    targetRme = 0.01,
     warmupIterationCount = 1,
     batchIterationCount = Infinity,
     batchTimeout = 1_000,
@@ -87,7 +87,7 @@ export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHa
             try {
               cb();
             } catch (error) {
-              onMeasureError(error);
+              onMeasureError?.(error);
             }
             afterIteration?.();
           }
@@ -113,7 +113,7 @@ export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHa
       try {
         cb();
       } catch (error) {
-        onMeasureError(error);
+        onMeasureError?.(error);
       }
       histogram.add(performance.now() - iterationTs);
 
@@ -126,16 +126,16 @@ export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHa
       const rme = histogram.getRme();
 
       if (measureDuration > measureTimeout || i > 2 && targetRme >= rme) {
-        onMeasureProgress(1);
+        onMeasureProgress?.(1);
 
         // Measurements completed
         return Promise.resolve().then(afterBatch);
       }
 
       if (i > 2) {
-        onMeasureProgress(Math.max(measureDuration / measureTimeout, targetRme / rme));
+        onMeasureProgress?.(Math.max(measureDuration / measureTimeout, targetRme / rme));
       } else {
-        onMeasureProgress(measureDuration / measureTimeout);
+        onMeasureProgress?.(measureDuration / measureTimeout);
       }
 
       if (Date.now() - batchTs > batchTimeout || j >= batchIterationCount) {
@@ -154,10 +154,10 @@ export function measureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHa
   return lifecyclePromise
       .then(onMeasureStart)
       .then(beforeBatch)
-      .then(() => onMeasureProgress(0))
+      .then(() => onMeasureProgress?.(0))
       .then(nextBatch)
       .then(() => {
-        onMeasureEnd(histogram);
+        onMeasureEnd?.(histogram);
         return histogram;
       });
 }

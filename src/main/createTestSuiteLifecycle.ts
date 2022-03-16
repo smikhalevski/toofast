@@ -4,17 +4,15 @@ import {DescribeNode, NodeType, TestNode, TestSuiteNode} from './node-types';
 
 export interface TestSuiteLifecycleHandlers {
 
-  onDescribeDeclarationStart(node: DescribeNode): void;
+  /**
+   * Triggered before the `describe` block is run.
+   */
+  onDescribeStart?(node: DescribeNode): void;
 
-  onDescribeDeclarationEnd(node: DescribeNode): void;
-
-  onTestDeclarationStart(node: TestNode): void;
-
-  onTestDeclarationEnd(node: TestNode): void;
-
-  onDescribeStart(node: DescribeNode): void;
-
-  onDescribeEnd(node: DescribeNode): void;
+  /**
+   * Triggered after the `describe` block is completed.
+   */
+  onDescribeEnd?(node: DescribeNode): void;
 }
 
 export interface TestSuiteLifecycle {
@@ -37,12 +35,9 @@ export interface TestSuiteLifecycle {
   run(): Promise<void>;
 }
 
-export function createTestSuiteLifecycle(testLifecycle: (node: TestNode) => Promise<void>, handlers: TestSuiteLifecycleHandlers): TestSuiteLifecycle {
+export function createTestSuiteLifecycle(runTestLifecycle: (node: TestNode) => Promise<void>, handlers: TestSuiteLifecycleHandlers = {}): TestSuiteLifecycle {
+
   const {
-    onDescribeDeclarationStart,
-    onDescribeDeclarationEnd,
-    onTestDeclarationStart,
-    onTestDeclarationEnd,
     onDescribeStart,
     onDescribeEnd,
   } = handlers;
@@ -79,15 +74,17 @@ export function createTestSuiteLifecycle(testLifecycle: (node: TestNode) => Prom
       parentNode.children.push(node);
       parentNode = node;
 
-      onDescribeDeclarationStart(node);
+      if (onDescribeStart) {
+        lifecyclePromise = lifecyclePromise.then(() => onDescribeStart(node));
+      }
 
-      lifecyclePromise = lifecyclePromise.then(() => onDescribeStart(node));
       cb();
-      lifecyclePromise = lifecyclePromise.then(() => onDescribeEnd(node));
+
+      if (onDescribeEnd) {
+        lifecyclePromise = lifecyclePromise.then(() => onDescribeEnd(node));
+      }
 
       parentNode = node.parentNode;
-
-      onDescribeDeclarationEnd(node);
     },
 
     test(label) {
@@ -98,11 +95,7 @@ export function createTestSuiteLifecycle(testLifecycle: (node: TestNode) => Prom
       };
       parentNode.children.push(node);
 
-      onTestDeclarationStart(node);
-
-      lifecyclePromise = lifecyclePromise.then(() => testLifecycle(node));
-
-      onTestDeclarationEnd(node);
+      lifecyclePromise = lifecyclePromise.then(() => runTestLifecycle(node));
     },
   };
 
