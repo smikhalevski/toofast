@@ -78,7 +78,9 @@ export function runWorker(): void {
 
       const vmContext = vm.createContext(lifecycle.runtime);
 
-      vm.runInContext(jsCode, vmContext);
+      vm.runInContext(jsCode, vmContext, {
+        filename: message.filePath,
+      });
 
       lifecycle.run()
           .catch((error) => {
