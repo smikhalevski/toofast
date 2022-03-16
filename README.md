@@ -1,4 +1,4 @@
-# TooFast
+# TooFast [![build](https://github.com/smikhalevski/toofast/actions/workflows/master.yml/badge.svg?branch=master&event=push)](https://github.com/smikhalevski/toofast/actions/workflows/master.yml)
 
 The Node.js performance testing tool with unit-test-like API.
 
