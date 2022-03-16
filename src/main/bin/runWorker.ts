@@ -1,9 +1,11 @@
 import fs from 'fs';
 import vm from 'vm';
+import {createRequire} from 'module';
 import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle';
 import {getErrorMessage, getStats, handleMasterMessage} from './utils';
 import {runMeasureLifecycle} from '../runMeasureLifecycle';
 import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
+import path from 'path';
 
 /**
  * Runs worker that waits for test init message and sends lifecycle messages to parent process.
@@ -71,15 +73,20 @@ export function runWorker(): void {
   process.on('message', (message: MasterMessage) => handleMasterMessage(message, {
 
     onTestLifecycleInitMessage(message) {
+      const {filePath} = message;
 
-      const jsCode = fs.readFileSync(message.filePath, 'utf-8');
+      const jsCode = fs.readFileSync(filePath, 'utf-8');
 
       const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers);
 
-      const vmContext = vm.createContext(lifecycle.runtime);
+      const vmContext = vm.createContext(Object.assign({
+        require: createRequire(filePath),
+        __dirname: path.dirname(filePath),
+        __filename: filePath,
+      }, lifecycle.runtime));
 
       vm.runInContext(jsCode, vmContext, {
-        filename: message.filePath,
+        filename: filePath,
       });
 
       lifecycle.run()

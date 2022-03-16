@@ -1,3 +1,5 @@
+const dependencyValue = require('./perf-dependency');
+
 function factorial(num) {
   if (num < 0) {
     return -1;
@@ -14,7 +16,7 @@ describe('describe 0', () => {
     measure(() => factorial(30));
   });
 
-  test('test 0.1', (measure) => {
+  test('test 0.1 (' + dependencyValue + ')', (measure) => {
     measure(() => 'a' + 'b');
   });
 

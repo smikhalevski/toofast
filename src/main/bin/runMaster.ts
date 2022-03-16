@@ -6,6 +6,7 @@ import cluster from 'cluster';
 import vm from 'vm';
 import {getTestPath, handleWorkerMessage} from './utils';
 import {TestNode} from '../node-types';
+import {createRequire} from 'module';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
@@ -67,7 +68,11 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
 
   }), handlers);
 
-  const vmContext = vm.createContext(lifecycle.runtime);
+  const vmContext = vm.createContext(Object.assign({
+    require: createRequire(filePath),
+    __dirname: path.dirname(filePath),
+    __filename: filePath,
+  }, lifecycle.runtime));
 
   vm.runInContext(jsCode, vmContext, {
     filename: filePath,
