@@ -25,25 +25,17 @@ describe('createTestSuiteLifecycle', () => {
     const r = lifecycle.runtime;
 
     r.describe('0', () => {
-
       r.test('0.0', () => undefined);
     });
-
     r.describe('1', () => {
-
       r.describe('1.0', () => {
-
         r.test('1.0.0', () => undefined);
       });
-
       r.describe('1.1', () => {
-
         r.test('1.1.0', () => undefined);
-
         r.test('1.1.1', () => undefined);
       });
     });
-
     r.test('2', () => undefined);
 
     const node: TestSuiteNode = {

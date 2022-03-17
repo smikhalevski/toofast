@@ -80,8 +80,9 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
   // Warmup phase
   if (warmupIterationCount > 0) {
     lifecyclePromise = lifecyclePromise
-        .then(onMeasureWarmupStart)
         .then(() => {
+          onMeasureWarmupStart?.();
+
           for (let i = 0; i < warmupIterationCount; ++i) {
             beforeIteration?.();
             try {
@@ -91,10 +92,13 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
             }
             afterIteration?.();
           }
+
+          return afterWarmup?.();
         })
-        .then(afterWarmup)
-        .then(onMeasureWarmupEnd)
-        .then(() => sleep(batchIntermissionTimeout));
+        .then(() => {
+          onMeasureWarmupEnd?.();
+          return sleep(batchIntermissionTimeout);
+        });
   }
 
   let i = 0; // Total iteration count
@@ -129,13 +133,13 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
         onMeasureProgress?.(1);
 
         // Measurements completed
-        return Promise.resolve().then(afterBatch);
+        return Promise.resolve(afterBatch?.());
       }
 
       if (i > 2) {
-        onMeasureProgress?.(Math.max(measureDuration / measureTimeout, targetRme / rme));
+        onMeasureProgress?.(Math.max(measureDuration / measureTimeout, targetRme / rme) || 0);
       } else {
-        onMeasureProgress?.(measureDuration / measureTimeout);
+        onMeasureProgress?.(measureDuration / measureTimeout || 0);
       }
 
       if (Date.now() - batchTs > batchTimeout || j >= batchIterationCount) {
