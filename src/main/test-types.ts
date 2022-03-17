@@ -79,3 +79,16 @@ export interface Runtime {
   describe: Describe;
   test: Test;
 }
+
+declare global {
+  // TODO Consider renaming to avoid clash with Jest types
+  // let beforeEach: MountHook;
+  // let afterEach: MountHook;
+  let afterWarmup: MountHook;
+  let beforeBatch: MountHook;
+  let afterBatch: MountHook;
+  let beforeIteration: MountSyncHook;
+  let afterIteration: MountSyncHook;
+  // let describe: Describe;
+  // let test: Test;
+}
