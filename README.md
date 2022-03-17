@@ -38,6 +38,10 @@ To run tests:
 npx toofast ./sum.perf.js
 ```
 
+Output would be:
+
+<img src="./output.png" alt="Test output" width="500">
+
 # Lifecycle
 
 Each test is run in a separate process.
