@@ -1,54 +1,149 @@
-# perf-test
+# TooFast [![build](https://github.com/smikhalevski/toofast/actions/workflows/master.yml/badge.svg?branch=master&event=push)](https://github.com/smikhalevski/toofast/actions/workflows/master.yml)
 
-The Node.js performance testing tool.
+The Node.js performance testing tool with unit-test-like API.
 
 ```shell
-npm install --save-dev @smikhalevski/perf-test
+npm install --save-dev toofast
 ```
 
-⚠️ [API documentation is available here.](https://smikhalevski.github.io/perf-test/)
+- Each test is run in a separate process.
 
-## Usage
+- [`performance`](https://developer.mozilla.org/en-US/docs/Web/API/Performance) is used to measure function execution
+  time. Measurements are taken on every function call.
 
-Measure performance of a callback:
+- To measure performance, a function is run multiple times in batches. After each batch a process is idle for some time
+  to allow garbage collection to kick in.
 
-```js
-const {test} = require('@smikhalevski/perf-test');
+- Before performance is measured a warmup run of the tested function is done. Warmup is always completed in a single
+  batch.
 
-function callback() {
-  // The code you want to test goes here
+[API documentation is available here.](https://smikhalevski.github.io/toofast/)
+
+# Usage
+
+Let's get started by writing a test for a hypothetical function that adds two numbers. First, create a `sum.js` file:
+
+```ts
+function sum(a, b) {
+  return a + b;
 }
 
-test('My test', callback, {timeout: 3000});
-// stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
+module.exports = sum;
 ```
 
-Measure performance of a callback across a population of values:
+Then, create a file named `sum.perf.js`. This will contain our actual performance test:
 
-```js
-const {valueTest} = require('@smikhalevski/perf-test');
+```ts
+const sum = require('./sum');
 
-function callback(value) {
-  // value is 1, 2 or 3 
-  // The code you want to test goes here
-}
-
-valueTest([1, 2, 3], 'My test', callback, {timeout: 3000});
-// stdout: "My test 7,331,041.16 ops/sec ± 0.19%"
+test('add numbers', (measure) => {
+  measure(() => {
+    sum(1, 2);
+  });
+});
 ```
 
-Get programmatic access to the test result statistics:
+To run tests:
 
-```js
-const {createHistogram, cycle} = require('@smikhalevski/perf-test');
+```shell
+toofast sum.perf.js
+```
 
-function callback() {
-  // The code you want to test goes here
-}
+# Test API
 
-const histogram = createHistogram();
+In test files, each of these callbacks is available in the global environment. You don't have to require or import
+anything to use them.
 
-cycle(callback, histogram, {timeout: 3000});
+### `test`
 
-histogram.getHz(); // → 7331041.16
+All you need in a test file is the `test` callback which runs a test. For example, let's say there's a
+function `myFunction()` which performance must be measured. Your whole test could be:
+
+```ts
+test('without arguments', (measure) => {
+  measure(() => {
+    myFunction();
+  });
+});
+```
+
+`measure` callback starts performance measurement and can be invoked multiple times inside a `test` block.
+
+```ts
+test('with various arguments', (measure) => {
+  measure(() => {
+    myFunction(123);
+  });
+  measure(() => {
+    myFunction('abc');
+  });
+});
+```
+
+`measure` returns a promise that is resolved as soon as performance measurement is completed. Results collected during
+all `measure` calls are used as a data population to derive function performance statistics.
+
+You can customise the measurement process by providing options to `measure`:
+
+```ts
+measure(() => {
+  myFunction();
+}, {warmupIterationCount: 20});
+```
+
+Following options are available:
+
+- `measureTimeout = 10_000` Maximum measure duration. Doesn't include the duration of warmup iterations.
+- `targetRme = 0.002` The maximum relative margin of error that must be reached for each measurement [0, 1].
+- `warmupIterationCount = 1` The maximum number of warmup iterations that are run before each measurement.
+- `batchIterationCount = Infinity` The maximum number of iterations in a batch.
+- `batchTimeout = 1_000` The maximum duration of batched measurements.
+- `batchIntermissionTimeout = 200` The delay between batched measurements. VM is expected to run garbage collector
+  during this delay.
+
+#### `describe`
+
+Creates a block that groups together several related tests.
+
+```ts
+describe('my function', () => {
+
+  test('without arguments', (measure) => {
+    measure(() => {
+      myFunction();
+    });
+  });
+
+  test('with two arguments', (measure) => {
+    measure(() => {
+      myFunction(123, 'abc');
+    });
+  });
+});
+```
+
+## Hooks
+
+Hooks are callbacks that are invoked at different phases of the performance test lifecycle: `beforeEach`, `afterEach`
+, `afterWarmup`, `beforeBatch`, `afterBatch`, `beforeIteration`, and `afterIteration`.
+
+```ts
+describe('my function', () => {
+
+  beforeEach(() => {
+    // Runs before each test
+  });
+
+  test('without arguments', (measure) => {
+
+    beforeIteration(() => {
+      // Runs before each measurement iteration
+    });
+
+    measure(() => {
+      myFunction();
+    });
+  });
+
+});
 ```

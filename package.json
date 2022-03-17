@@ -1,25 +1,30 @@
 {
-  "name": "@smikhalevski/perf-test",
+  "name": "toofast",
   "version": "1.0.0",
-  "description": "The Node.js performance testing tool.",
+  "description": "The Node.js performance testing tool with unit-test-like API.",
   "main": "./lib/index-cjs.js",
   "module": "./lib/index.js",
   "types": "./lib/index.d.ts",
+  "bin": {
+    "toofast": "./lib/bin.js"
+  },
+  "sideEffects": false,
   "files": [
     "lib"
   ],
   "scripts": {
-    "build": "set -e; tsc; npm run rollup",
+    "build": "tsc && npm run rollup && npm run rollup-bin",
     "rollup": "rollup --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
-    "clean": "rm -rf ./lib",
+    "rollup-bin": "rollup --banner '#!/usr/bin/env node' --input ./lib/bin/index.js --file ./lib/bin.js --format cjs --plugin @rollup/plugin-node-resolve && rimraf ./lib/bin && chmod +x ./lib/bin.js",
+    "clean": "rimraf ./lib",
     "test": "jest --detectOpenHandles",
     "docs": "typedoc ./src/main/index.ts",
-    "publish-docs": "set -ex; [ -d ./docs ]; [[ ! $(git status --porcelain) ]]; branch=$(git rev-parse --abbrev-ref HEAD); sha=$(git rev-parse --short HEAD); t=$(mktemp -d); cp -R ./docs/ $t; git checkout ghpages; ls -A | grep -wv .git | xargs rm -rf; cp -R $t/ .; git add .; git commit -m \"Updated docs ($sha)\"; git push; git checkout $branch",
-    "release-docs": "set -e; npm run clean; npm run docs; npm run publish-docs"
+    "publish-docs": "[ -d ./docs ] && [[ ! $(git status --porcelain) ]] && branch=$(git rev-parse --abbrev-ref HEAD) && sha=$(git rev-parse --short HEAD) && t=$(mktemp -d) && cp -R ./docs/ $t && git checkout ghpages && ls -A | grep -wv .git | xargs rm -rf && cp -R $t/ . && git add . && git commit -m \"Updated docs ($sha)\" && git push && git checkout $branch",
+    "release-docs": "npm run clean && npm run docs && npm run publish-docs"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/smikhalevski/perf-test.git"
+    "url": "git+https://github.com/smikhalevski/toofast.git"
   },
   "keywords": [
     "performance",
@@ -29,19 +34,21 @@
   "author": "Savva Mikhalevski <smikhalevski@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/smikhalevski/perf-test/issues"
+    "url": "https://github.com/smikhalevski/toofast/issues"
   },
-  "homepage": "https://github.com/smikhalevski/perf-test#readme",
+  "homepage": "https://github.com/smikhalevski/toofast#readme",
   "jest": {
     "preset": "ts-jest"
   },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^13.0.0",
-    "@types/jest": "^26.0.23",
-    "jest": "^27.0.2",
-    "rollup": "^2.50.5",
-    "ts-jest": "^27.0.2",
-    "typedoc": "^0.21.4",
-    "typescript": "4.2.4"
+    "@rollup/plugin-node-resolve": "^13.1.3",
+    "@types/jest": "^27.4.0",
+    "jest": "^27.5.1",
+    "kleur": "^4.1.4",
+    "rimraf": "^3.0.2",
+    "rollup": "^2.67.2",
+    "ts-jest": "^27.1.3",
+    "typedoc": "^0.22.11",
+    "typescript": "^4.5.5"
   }
 }
