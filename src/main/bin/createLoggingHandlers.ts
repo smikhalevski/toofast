@@ -34,7 +34,6 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
   let depth = 0;
   let testLabel: string;
   let errorMessage: string | undefined;
-  let measureStats: Stats | undefined;
   let measureCount = 0;
 
   const percentFormat = new Intl.NumberFormat('en', {
@@ -72,7 +71,6 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       testLabel = node.label.padEnd(getLabelLength(node));
       measureCount = 0;
       errorMessage = undefined;
-      measureStats = undefined;
 
       clearLine();
       write(
@@ -118,6 +116,9 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           M_PADDING.repeat(depth)
           + M_WARMUP
           + testLabel
+          + M_PADDING
+          + formatMeasureCount(measureCount)
+          + M_PADDING
       );
     },
 
@@ -127,7 +128,6 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
 
     onMeasureEnd(node, stats) {
-      measureStats = stats;
       ++measureCount;
     },
 
@@ -142,14 +142,15 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           + (errorMessage ? M_PENDING_ERROR : M_PENDING)
           + testLabel
           + M_PADDING
+          + formatMeasureCount(measureCount)
           + percentFormat.format(percent).padStart(4)
-          + (measureCount !== 0 ? dim(' (' + integerFormat.format(measureCount + 1) + ')') : '')
       );
-      if (measureStats) {
-        write(M_PADDING + formatStats(measureStats));
-      }
     },
   };
+}
+
+function formatMeasureCount(count: number): string {
+  return count > 0 ? dim(integerFormat.format(count + 1) + 'x') : '';
 }
 
 function formatStats(stats: Stats): string {
