@@ -6,6 +6,17 @@ The Node.js performance testing tool with unit-test-like API.
 npm install --save-dev toofast
 ```
 
+- Each test is run in a separate process.
+
+- [`performance`](https://developer.mozilla.org/en-US/docs/Web/API/Performance) is used to measure function execution
+  time. Measurements are taken on every function call.
+
+- To measure performance, a function is run multiple times in batches. After each batch a process is idle for some time
+  to allow garbage collection to kick in.
+
+- Before performance is measured a warmup run of the tested function is done. Warmup is always completed in a single
+  batch.
+
 [API documentation is available here.](https://smikhalevski.github.io/toofast/)
 
 # Usage
@@ -35,78 +46,60 @@ test('add numbers', (measure) => {
 To run tests:
 
 ```shell
-npx toofast ./sum.perf.js
+toofast sum.perf.js
 ```
 
-Output would be:
+# Test API
 
-<img src="./output.png" alt="Test output" width="500">
+In test files, each of these callbacks is available in the global environment. You don't have to require or import
+anything to use them.
 
-# Lifecycle
+### `test`
 
-Each test is run in a separate process.
-
-Before performance is measured a warmup run of the tested function is performed.
-
-`performance` is used to measure function execution time. Measurements are taken on every function call.
-
-To measure performance, a function is run multiple times in batches. After each batch a process is idle for some time to allow garbage collection to kick in.
-
-In test files, each of these methods is available in the global environment. You don't have to require or import anything to use them.
-
-
-#### `test`
-
-All you need in a test file is the `test` method which runs a test. For example, let's say there's a function `myFunction()` which performance must be measured. Your whole test could be:
+All you need in a test file is the `test` callback which runs a test. For example, let's say there's a
+function `myFunction()` which performance must be measured. Your whole test could be:
 
 ```ts
-test('without args', (measure) => {
+test('without arguments', (measure) => {
   measure(() => {
     myFunction();
   });
 });
 ```
 
-Measurements in `test` can be tweaked using an options argument:
+`measure` callback starts performance measurement and can be invoked multiple times inside a `test` block.
 
 ```ts
-test('without args', (measure) => {
-  // ...
-}, {
-  warmupIterationCount: 20
-});
-```
-
-[There are multiple options that can be configured.](#options)
-
-`measure` callback starts actual performance measurement. It can be invoked mutiple times in a test block.
-
-```ts
-test('average across varargs', (measure) => {
-
+test('with various arguments', (measure) => {
   measure(() => {
-    myFunction(1, 2);
+    myFunction(123);
   });
-
   measure(() => {
-    myFunction('a', 'b');
-  });
-
-});
-```
-
-`measure` accepts options:
-
-```ts
-test('without args', (measure) => {
-  
-  measure(() => {
-    myFunction(1, 2);
-  }, {
-    warmupIterationCount: 20
+    myFunction('abc');
   });
 });
 ```
+
+`measure` returns a promise that is resolved as soon as performance measurement is completed. Results collected during
+all `measure` calls are used as a data population to derive function performance statistics.
+
+You can customise the measurement process by providing options to `measure`:
+
+```ts
+measure(() => {
+  myFunction();
+}, {warmupIterationCount: 20});
+```
+
+Following options are available:
+
+- `measureTimeout = 10_000` Maximum measure duration. Doesn't include the duration of warmup iterations.
+- `targetRme = 0.002` The maximum relative margin of error that must be reached for each measurement [0, 1].
+- `warmupIterationCount = 1` The maximum number of warmup iterations that are run before each measurement.
+- `batchIterationCount = Infinity` The maximum number of iterations in a batch.
+- `batchTimeout = 1_000` The maximum duration of batched measurements.
+- `batchIntermissionTimeout = 200` The delay between batched measurements. VM is expected to run garbage collector
+  during this delay.
 
 #### `describe`
 
@@ -117,112 +110,40 @@ describe('my function', () => {
 
   test('without arguments', (measure) => {
     measure(() => {
-      myFunction(1, 2);
+      myFunction();
     });
   });
 
   test('with two arguments', (measure) => {
     measure(() => {
-      myFunction();
+      myFunction(123, 'abc');
     });
   });
 });
 ```
 
-[There are multiple options that can be configured.](#options)
+## Hooks
 
-#### `beforeEach`
-
-Runs a function before each of the tests in the file runs. If the function returns a promise, then it is awaited before running the test.
-
-```ts
-beforeEach(() => {
-  // ...
-})
-```
-
-#### `afterEach`
-
-Runs a function after each one of the tests in this file completes. If the function returns a promise, then it is awaited before before continuing.
+Hooks are callbacks that are invoked at different phases of the performance test lifecycle: `beforeEach`, `afterEach`
+, `afterWarmup`, `beforeBatch`, `afterBatch`, `beforeIteration`, and `afterIteration`.
 
 ```ts
-afterEach(() => {
-  // ...
-})
+describe('my function', () => {
+
+  beforeEach(() => {
+    // Runs before each test
+  });
+
+  test('without arguments', (measure) => {
+
+    beforeIteration(() => {
+      // Runs before each measurement iteration
+    });
+
+    measure(() => {
+      myFunction();
+    });
+  });
+
+});
 ```
-
-#### `afterWarmup`
-
-Runs a function after warmup is completed. If the function returns a promise, then it is awaited before before continuing.
-
-```ts
-afterWarmup(() => {
-  // ...
-})
-```
-
-#### `beforeBatch`
-
-Runs before a batch of iterations is started. If the function returns a promise, then it is awaited before before continuing.
-
-```ts
-beforeBatch(() => {
-  // ...
-})
-```
-
-#### `afterBatch`
-
-Runs after a batch of iterations is completed. If the function returns a promise, then it is awaited before before continuing.
-
-```ts
-afterBatch(() => {
-  // ...
-})
-```
-
-#### `beforeIteration`
-
-Runs before each call of a function which performance is measured.
-
-```ts
-beforeIteration(() => {
-  // ...
-})
-```
-
-#### `afterIteration`
-
-Runs after each call of a function which performance is measured.
-
-```ts
-afterIteration(() => {
-  // ...
-})
-```
-
-# Options
-
-#### `measureTimeout = 10_000`
-
-Maximum measure duration. Doesn't include the duration of warmup iterations.
-
-#### `targetRme = 0.002`
-
-The maximum relative margin of error that must be reached for each measurement [0, 1].
-
-#### `warmupIterationCount = 1`
-
-The maximum number of warmup iterations that are run before each measurement.
-
-#### `batchIterationCount = Infinity`
-
-The maximum number of iterations in a batch.
-
-#### `batchTimeout = 1_000`
-
-The maximum duration of batched measurements.
-
-#### `batchIntermissionTimeout = 200`
-
-The delay between batched measurements. VM is expected to run garbage collector during this delay.
