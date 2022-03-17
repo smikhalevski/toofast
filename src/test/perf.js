@@ -1,12 +1,12 @@
 const dependencyValue = require('./perf-dependency');
 
-function factorial(num) {
-  if (num < 0) {
+function factorial(x) {
+  if (x < 0) {
     return -1;
-  } else if (num === 0) {
+  } else if (x === 0) {
     return 1;
   } else {
-    return num * factorial(num - 1);
+    return x * factorial(x - 1);
   }
 }
 

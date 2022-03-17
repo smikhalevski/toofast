@@ -10,28 +10,30 @@ npm install --save-dev toofast
 
 ## Usage
 
+Let's get started by writing a test for a hypothetical function that adds two numbers. First, create a `sum.js` file:
+
 ```ts
-// ./myPerfTest.js
-import {myFunction} from './myModule';
+function sum(a, b) {
+  return a + b;
+}
 
-describe('myFunction', () => {
+module.exports = sum;
+```
 
-  test('with one string arg', (measure) => {
-    measure(() => {
-      myFunction('abc');
-    });
+Then, create a file named `sum.perf.js`. This will contain our actual performance test:
+
+```ts
+const sum = require('./sum');
+
+test('add 1 + 2', (measure) => {
+  measure(() => {
+    sum(1, 2);
   });
-
-  test('with string and number args', (measure) => {
-    measure(() => {
-      myFunction('abc', 123);
-    });
-  });
-})
+});
 ```
 
 To run tests:
 
 ```shell
-toofast ./myPerfTest.js
+npx toofast ./sum.perf.js
 ```
