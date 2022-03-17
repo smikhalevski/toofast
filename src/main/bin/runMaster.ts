@@ -1,12 +1,12 @@
-import {createTestSuiteLifecycle} from '../createTestSuiteLifecycle';
-import {MasterLifecycleHandlers, WorkerMessage, MessageType, TestLifecycleInitMessage} from './bin-types';
+import cluster from 'cluster';
 import path from 'path';
 import fs from 'fs';
-import cluster from 'cluster';
 import vm from 'vm';
+import {createRequire} from 'module';
+import {createTestSuiteLifecycle} from '../createTestSuiteLifecycle';
+import {MasterLifecycleHandlers, WorkerMessage, MessageType, TestLifecycleInitMessage} from './bin-types';
 import {getTestPath, handleWorkerMessage} from './utils';
 import {TestNode} from '../node-types';
-import {createRequire} from 'module';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
@@ -52,9 +52,10 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
     const worker = cluster.fork();
 
     worker.on('message', handleMessage);
-    worker.on('exit', resolve);
     worker.on('error', (error) => {
       handlers.onTestFatalError(testNode, error);
+    });
+    worker.on('exit', (exitCode) => {
       resolve();
     });
 

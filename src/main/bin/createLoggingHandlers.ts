@@ -1,37 +1,41 @@
-import {bold, dim, green, red} from 'kleur/colors';
+import rl from 'readline';
+import {bold, dim, green, red, yellow} from 'kleur/colors';
 import {getErrorMessage, getLabelLength} from './utils';
-import {MasterLifecycleHandlers} from './bin-types';
+import {MasterLifecycleHandlers, Stats} from './bin-types';
 import {NodeType} from '../node-types';
 
-const PADDING = '  ';
-const PENDING = dim('○ ');
-const FAILURE = red('● ');
-const SUCCESS = green('● ');
+const M_PADDING = '  ';
+const M_PENDING = dim('○ ');
+const M_PENDING_ERROR = red('○ ');
+const M_WARMUP = yellow('○ ');
+const M_ERROR = red('● ');
+const M_SUCCESS = green('● ');
+
+const numberFormat = new Intl.NumberFormat('en', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  useGrouping: true,
+});
+
+const integerFormat = new Intl.NumberFormat('en', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+  useGrouping: true,
+});
+
+const rmeFormat = new Intl.NumberFormat('en', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+  style: 'percent',
+});
 
 export function createLoggingHandlers(): MasterLifecycleHandlers {
 
   let depth = 0;
   let testLabel: string;
   let errorMessage: string | undefined;
-  let measurementCount = 0;
-
-  const numberFormat = new Intl.NumberFormat('en', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,
-  });
-
-  const integerFormat = new Intl.NumberFormat('en', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-    useGrouping: true,
-  });
-
-  const rmeFormat = new Intl.NumberFormat('en', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-    style: 'percent',
-  });
+  let measureStats: Stats | undefined;
+  let measureCount = 0;
 
   const percentFormat = new Intl.NumberFormat('en', {
     minimumFractionDigits: 0,
@@ -42,15 +46,11 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
   return {
 
     onDescribeStart(node) {
-      if (errorMessage) {
-        write('\n\n');
-        errorMessage = undefined;
-      }
       if (node.parentNode.nodeType !== NodeType.TEST_SUITE || node.parentNode.children[0] !== node) {
         write('\n');
       }
       write(
-          PADDING.repeat(depth)
+          M_PADDING.repeat(depth)
           + bold(node.label)
           + '\n'
       );
@@ -62,34 +62,35 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
 
     onTestStart(node) {
-      if (errorMessage) {
-        write('\n\n');
-        errorMessage = undefined;
-      }
-      testLabel = node.label.padEnd(getLabelLength(node));
-      measurementCount = 0;
 
-      if (node.parentNode.children[node.parentNode.children.indexOf(node) - 1]?.nodeType === NodeType.DESCRIBE) {
+      if (errorMessage != null) {
+        write('\n\n');
+      } else if (node.parentNode.children[node.parentNode.children.indexOf(node) - 1]?.nodeType === NodeType.DESCRIBE) {
         write('\n');
       }
+
+      testLabel = node.label.padEnd(getLabelLength(node));
+      measureCount = 0;
+      errorMessage = undefined;
+      measureStats = undefined;
+
+      clearLine();
       write(
-          '\r'
-          + PADDING.repeat(depth)
-          + PENDING
+          M_PADDING.repeat(depth)
+          + M_PENDING
           + testLabel
-          + PADDING
+          + M_PADDING
       );
     },
 
     onTestEnd(node, stats) {
+      clearLine();
       write(
-          '\r'
-          + PADDING.repeat(depth)
-          + (errorMessage ? FAILURE : SUCCESS)
+          M_PADDING.repeat(depth)
+          + (errorMessage ? M_ERROR : M_SUCCESS)
           + testLabel
-          + PADDING
-          + numberFormat.format(stats.hz)
-          + dim(' ops/sec ± ' + rmeFormat.format(stats.rme))
+          + M_PADDING
+          + formatStats(stats)
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
@@ -97,10 +98,10 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
 
     onTestFatalError(node, error) {
       errorMessage = getErrorMessage(error);
+      clearLine();
       write(
-          '\r'
-          + PADDING.repeat(depth)
-          + FAILURE
+          M_PADDING.repeat(depth)
+          + M_ERROR
           + testLabel
           + '\n'
           + red(errorMessage)
@@ -112,14 +113,22 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
 
     onMeasureWarmupStart(node) {
+      clearLine();
+      write(
+          M_PADDING.repeat(depth)
+          + M_WARMUP
+          + testLabel
+      );
     },
+
     onMeasureWarmupEnd(node) {
     },
     onMeasureStart(node) {
     },
 
     onMeasureEnd(node, stats) {
-      ++measurementCount;
+      measureStats = stats;
+      ++measureCount;
     },
 
     onMeasureError(node, error) {
@@ -127,17 +136,29 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
 
     onMeasureProgress(node, percent) {
+      clearLine();
       write(
-          '\r'
-          + PADDING.repeat(depth)
-          + PENDING
+          M_PADDING.repeat(depth)
+          + (errorMessage ? M_PENDING_ERROR : M_PENDING)
           + testLabel
-          + PADDING
+          + M_PADDING
           + percentFormat.format(percent).padStart(4)
-          + (measurementCount !== 0 ? dim(' (' + integerFormat.format(measurementCount + 1) + ')') : '')
+          + (measureCount !== 0 ? dim(' (' + integerFormat.format(measureCount + 1) + ')') : '')
       );
+      if (measureStats) {
+        write(M_PADDING + formatStats(measureStats));
+      }
     },
   };
+}
+
+function formatStats(stats: Stats): string {
+  return numberFormat.format(stats.hz) + dim(' ops/sec ± ' + rmeFormat.format(stats.rme));
+}
+
+function clearLine(): void {
+  rl.clearLine(process.stdout, 0);
+  rl.cursorTo(process.stdout, 0);
 }
 
 function write(message: string): void {

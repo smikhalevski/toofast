@@ -1,3 +1,4 @@
+import path from 'path';
 import fs from 'fs';
 import vm from 'vm';
 import {createRequire} from 'module';
@@ -5,7 +6,6 @@ import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle
 import {getErrorMessage, getStats, handleMasterMessage} from './utils';
 import {runMeasureLifecycle} from '../runMeasureLifecycle';
 import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
-import path from 'path';
 
 /**
  * Runs worker that waits for test init message and sends lifecycle messages to parent process.

@@ -22,7 +22,7 @@ describe('describe 0', () => {
 
   describe('describe 0.1', () => {
 
-    test('test 0.1.0 (throws error)', (measure) => {
+    test('test 0.1.0 (error)', (measure) => {
       measure(() => {
         throw new Error('Expected error');
       });
@@ -42,12 +42,16 @@ describe('describe 0', () => {
 
     test('test 0.2.1 (multiple measurements)', (measure) => {
 
-      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
+      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
 
-      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
+      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
 
-      measure(() => 'a' + 'b', {measureTimeout: 3_000, targetRme: 0});
+      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
     });
+  });
+
+  test('test 0.1.2 (long warmup)', (measure) => {
+    measure(() => 'a' + 'b', {warmupIterationCount: 1000_000_000});
   });
 
 });
