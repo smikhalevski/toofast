@@ -82,7 +82,9 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
     lifecyclePromise = lifecyclePromise
         .then(() => {
           onMeasureWarmupStart?.();
-
+          return beforeBatch?.();
+        })
+        .then(() => {
           for (let i = 0; i < warmupIterationCount; ++i) {
             beforeIteration?.();
             try {
@@ -92,9 +94,9 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
             }
             afterIteration?.();
           }
-
-          return afterWarmup?.();
+          return afterBatch?.();
         })
+        .then(afterWarmup)
         .then(() => {
           onMeasureWarmupEnd?.();
           return sleep(batchIntermissionTimeout);

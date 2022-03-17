@@ -105,22 +105,21 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
       // Measure invocations must be sequential
       let measureLifecyclePromise = Promise.resolve();
 
-      const measure: Measure = (cb, options) => {
+      const measure: Measure = (cb, options) => measureLifecyclePromise = measureLifecyclePromise
+          .then(() => {
+            options = Object.assign({}, measureOptions, options);
 
-        options = Object.assign({}, measureOptions, options);
+            options.afterWarmup = combineHooks(afterWarmupHooks, options.afterWarmup);
+            options.beforeBatch = combineHooks(beforeBatchHooks, options.beforeBatch);
+            options.afterBatch = combineHooks(afterBatchHooks, options.afterBatch);
+            options.beforeIteration = combineSyncHooks(beforeIterationHooks, options.beforeIteration);
+            options.afterIteration = combineSyncHooks(afterIterationHooks, options.afterIteration);
 
-        options.afterWarmup = combineHooks(afterWarmupHooks, options.afterWarmup);
-        options.beforeBatch = combineHooks(beforeBatchHooks, options.beforeBatch);
-        options.afterBatch = combineHooks(afterBatchHooks, options.afterBatch);
-        options.beforeIteration = combineSyncHooks(beforeIterationHooks, options.beforeIteration);
-        options.afterIteration = combineSyncHooks(afterIterationHooks, options.afterIteration);
-
-        return measureLifecyclePromise = measureLifecyclePromise
-            .then(() => runMeasureLifecycle(cb, handlers, options))
-            .then((histogram) => {
-              testHistogram.addFromHistogram(histogram);
-            });
-      };
+            return runMeasureLifecycle(cb, handlers, options);
+          })
+          .then((histogram) => {
+            testHistogram.addFromHistogram(histogram);
+          });
 
       // Always wait for measure calls to resolve
       return Promise.resolve(cb(measure)).then(() => measureLifecyclePromise);

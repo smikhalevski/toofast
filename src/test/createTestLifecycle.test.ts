@@ -88,8 +88,8 @@ describe('createTestLifecycle', () => {
     expect(beforeEachHookMock).toHaveBeenCalledTimes(1);
     expect(afterEachHookMock).toHaveBeenCalledTimes(1);
     expect(afterWarmupHookMock).toHaveBeenCalledTimes(1);
-    expect(beforeBatchHookMock).toHaveBeenCalledTimes(1);
-    expect(afterBatchHookMock).toHaveBeenCalledTimes(1);
+    expect(beforeBatchHookMock).toHaveBeenCalledTimes(2);
+    expect(afterBatchHookMock).toHaveBeenCalledTimes(2);
     expect(beforeIterationHookMock).toHaveBeenCalledTimes(2);
     expect(afterIterationHookMock).toHaveBeenCalledTimes(2);
   });
@@ -119,8 +119,8 @@ describe('createTestLifecycle', () => {
     await lifecycle.run();
 
     expect(afterWarmupHookMock).toHaveBeenCalledTimes(1);
-    expect(beforeBatchHookMock).toHaveBeenCalledTimes(1);
-    expect(afterBatchHookMock).toHaveBeenCalledTimes(1);
+    expect(beforeBatchHookMock).toHaveBeenCalledTimes(2);
+    expect(afterBatchHookMock).toHaveBeenCalledTimes(2);
     expect(beforeIterationHookMock).toHaveBeenCalledTimes(2);
     expect(afterIterationHookMock).toHaveBeenCalledTimes(2);
   });
