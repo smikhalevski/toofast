@@ -75,7 +75,11 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
     afterIteration,
   } = options;
 
+  let {syncIterationCount = 0} = options;
+
   let lifecyclePromise = Promise.resolve();
+
+  syncIterationCount = Math.max(syncIterationCount | 0, 0);
 
   // Warmup phase
   if (warmupIterationCount > 0) {
@@ -85,15 +89,22 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
           return beforeBatch?.();
         })
         .then(() => {
+          let iterationDuration = Infinity;
+
           for (let i = 0; i < warmupIterationCount; ++i) {
             beforeIteration?.();
+            const iterationTs = performance.now();
             try {
               cb();
             } catch (error) {
               onMeasureError?.(error);
             }
+            iterationDuration = Math.min(iterationDuration, performance.now() - iterationTs);
             afterIteration?.();
           }
+
+          syncIterationCount ||= Math.ceil(batchTimeout / 1000 / iterationDuration);
+
           return afterBatch?.();
         })
         .then(afterWarmup)
@@ -108,6 +119,8 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
   const measureTs = Date.now();
 
   const nextBatch = (): Promise<void> | void => {
+    syncIterationCount ||= 1;
+
     const batchTs = Date.now();
 
     let j = 0; // Batch iteration count
@@ -116,17 +129,19 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
       beforeIteration?.();
 
       const iterationTs = performance.now();
-      try {
-        cb();
-      } catch (error) {
-        onMeasureError?.(error);
+      for (let i = 0; i < syncIterationCount; ++i) {
+        ++j;
+        try {
+          cb();
+        } catch (error) {
+          onMeasureError?.(error);
+        }
       }
-      histogram.add(performance.now() - iterationTs);
+      histogram.add((performance.now() - iterationTs) / syncIterationCount);
 
       afterIteration?.();
 
       ++i;
-      ++j;
 
       const measureDuration = Date.now() - measureTs;
       const rme = histogram.getRme();
