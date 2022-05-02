@@ -1,5 +1,5 @@
-import {MeasureOptions} from './test-types';
 import {Histogram} from './Histogram';
+import {MeasureOptions} from './test-types';
 import {sleep} from './utils';
 
 export interface MeasureLifecycleHandlers {

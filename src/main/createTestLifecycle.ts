@@ -1,6 +1,6 @@
-import {Hook, MeasureOptions, SyncHook, Runtime, Measure, Test, Describe} from './test-types';
 import {Histogram} from './Histogram';
-import {runMeasureLifecycle, MeasureLifecycleHandlers} from './runMeasureLifecycle';
+import {MeasureLifecycleHandlers, runMeasureLifecycle} from './runMeasureLifecycle';
+import {Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test} from './test-types';
 
 export type RunMeasureLifecycle = typeof runMeasureLifecycle;
 

@@ -1,4 +1,11 @@
-import {createTestSuiteLifecycle, DescribeNode, TestSuiteLifecycleHandlers, NodeType, TestNode, TestSuiteNode} from '../main';
+import {
+  createTestSuiteLifecycle,
+  DescribeNode,
+  NodeType,
+  TestNode,
+  TestSuiteLifecycleHandlers,
+  TestSuiteNode
+} from '../main';
 
 describe('createTestSuiteLifecycle', () => {
 
@@ -55,6 +62,7 @@ describe('createTestSuiteLifecycle', () => {
       nodeType: NodeType.TEST,
       parentNode: node0,
       label: '0.0',
+      enabled: true,
     };
     node0.children.push(node00);
 
@@ -78,6 +86,7 @@ describe('createTestSuiteLifecycle', () => {
       nodeType: NodeType.TEST,
       parentNode: node10,
       label: '1.0.0',
+      enabled: true,
     };
     node10.children.push(node100);
 
@@ -93,6 +102,7 @@ describe('createTestSuiteLifecycle', () => {
       nodeType: NodeType.TEST,
       parentNode: node11,
       label: '1.1.0',
+      enabled: true,
     };
     node11.children.push(node110);
 
@@ -100,6 +110,7 @@ describe('createTestSuiteLifecycle', () => {
       nodeType: NodeType.TEST,
       parentNode: node11,
       label: '1.1.1',
+      enabled: true,
     };
     node11.children.push(node111);
 
@@ -107,6 +118,7 @@ describe('createTestSuiteLifecycle', () => {
       nodeType: NodeType.TEST,
       parentNode: node,
       label: '2',
+      enabled: true,
     };
     node.children.push(node2);
 

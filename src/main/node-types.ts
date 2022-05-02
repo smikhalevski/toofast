@@ -20,4 +20,5 @@ export interface TestNode {
   nodeType: NodeType.TEST;
   parentNode: TestSuiteNode | DescribeNode;
   label: string;
+  enabled: boolean;
 }
