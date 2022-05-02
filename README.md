@@ -110,7 +110,7 @@ Following options are available:
 - `batchIntermissionTimeout = 200` The delay between batched measurements. VM is expected to run garbage collector
   during this delay.
 
-#### `describe`
+### `describe`
 
 Creates a block that groups together several related tests.
 
