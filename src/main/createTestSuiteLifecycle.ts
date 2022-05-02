@@ -40,7 +40,7 @@ export interface TestSuiteLifecycleOptions {
   /**
    * The list of test label patterns that must be run. If omitted then all tests are run.
    */
-  testNamePattern?: RegExp[];
+  testNamePatterns?: RegExp[];
 }
 
 export function createTestSuiteLifecycle(runTestLifecycle: (node: TestNode) => Promise<void>, handlers: TestSuiteLifecycleHandlers = {}, options: TestSuiteLifecycleOptions = {}): TestSuiteLifecycle {
@@ -51,7 +51,7 @@ export function createTestSuiteLifecycle(runTestLifecycle: (node: TestNode) => P
   } = handlers;
 
   const {
-    testNamePattern,
+    testNamePatterns,
   } = options;
 
   let runLifecycle: () => void;
@@ -112,9 +112,13 @@ export function createTestSuiteLifecycle(runTestLifecycle: (node: TestNode) => P
         nodeType: NodeType.TEST,
         parentNode,
         label,
-        enabled: !testNamePattern || testNamePattern.some((re) => re.test(label)),
+        enabled: true,
       };
       parentNode.children.push(node);
+
+      if (testNamePatterns) {
+        node.enabled = testNamePatterns.some((re) => isMatchingLabel(node, re));
+      }
 
       lifecyclePromise = lifecyclePromise.then(() => {
         if (node.enabled) {
@@ -132,6 +136,10 @@ export function createTestSuiteLifecycle(runTestLifecycle: (node: TestNode) => P
       return lifecyclePromise;
     },
   };
+}
+
+function isMatchingLabel(node: DescribeNode | TestNode, re: RegExp): boolean {
+  return re.test(node.label) || node.parentNode.nodeType !== NodeType.TEST_SUITE && isMatchingLabel(node.parentNode, re);
 }
 
 function hasEnabledTests(node: DescribeNode): boolean {

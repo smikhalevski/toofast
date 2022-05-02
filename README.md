@@ -55,6 +55,9 @@ toofast
 
 Alias `-t <regex>`. Run only tests with a name that matches the regex. This option can be specified multiple times.
 
+The regex is matched against the full name, which is a combination of the test label and all its enclosing describe
+blocks.
+
 # Test API
 
 In test files, each of these callbacks is available in the global environment. You don't have to require or import
