@@ -1,6 +1,6 @@
 {
   "name": "toofast",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "The Node.js performance testing tool with unit-test-like API.",
   "main": "./lib/index-cjs.js",
   "module": "./lib/index.js",
