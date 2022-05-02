@@ -46,8 +46,14 @@ test('add numbers', (measure) => {
 To run tests:
 
 ```shell
-toofast sum.perf.js
+toofast
 ```
+
+# CLI options
+
+### `--testNamePattern <regex>`
+
+Alias `-t <regex>`. Run only tests with a name that matches the regex. This option can be specified multiple times.
 
 # Test API
 

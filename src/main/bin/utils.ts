@@ -1,3 +1,5 @@
+import {Histogram} from '../Histogram';
+import {DescribeNode, NodeType, TestNode} from '../node-types';
 import {
   MasterMessage,
   MasterMessageHandlers,
@@ -6,9 +8,6 @@ import {
   WorkerMessage,
   WorkerMessageHandlers
 } from './bin-types';
-import {Histogram} from '../Histogram';
-import {DescribeNode, NodeType, TestNode} from '../node-types';
-import {type} from 'typedoc/dist/lib/output/themes/default/partials/type';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {

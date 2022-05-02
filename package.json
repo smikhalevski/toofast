@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc && npm run rollup && npm run rollup-bin",
     "rollup": "rollup --input ./lib/index.js --file ./lib/index-cjs.js --format cjs --plugin @rollup/plugin-node-resolve",
-    "rollup-bin": "rollup --banner '#!/usr/bin/env node' --input ./lib/bin/index.js --file ./lib/bin.js --format cjs --plugin @rollup/plugin-node-resolve && rimraf ./lib/bin && chmod +x ./lib/bin.js",
+    "rollup-bin": "rollup --external glob --banner '#!/usr/bin/env node' --input ./lib/bin/index.js --file ./lib/bin.js --format cjs --plugin @rollup/plugin-node-resolve && rimraf ./lib/bin && chmod +x ./lib/bin.js",
     "clean": "rimraf ./lib",
     "test": "jest --detectOpenHandles",
     "docs": "typedoc ./src/main/index.ts",
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^13.1.3",
+    "@types/glob": "^7.2.0",
     "@types/jest": "^27.4.0",
     "jest": "^27.5.1",
     "kleur": "^4.1.4",
@@ -50,5 +51,8 @@
     "ts-jest": "^27.1.3",
     "typedoc": "^0.22.11",
     "typescript": "^4.5.5"
+  },
+  "dependencies": {
+    "glob": "^8.0.1"
   }
 }

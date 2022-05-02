@@ -1,12 +1,14 @@
 import cluster from 'cluster';
-import path from 'path';
 import fs from 'fs';
-import vm from 'vm';
+import glob from 'glob';
 import {createRequire} from 'module';
-import {createTestSuiteLifecycle} from '../createTestSuiteLifecycle';
-import {MasterLifecycleHandlers, WorkerMessage, MessageType, TestLifecycleInitMessage} from './bin-types';
-import {getTestPath, handleWorkerMessage} from './utils';
+import path from 'path';
+import vm from 'vm';
+import {createTestSuiteLifecycle, TestSuiteLifecycleOptions} from '../createTestSuiteLifecycle';
 import {TestNode} from '../node-types';
+import {MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage} from './bin-types';
+import {parseCliOptions} from './parseCliOptions';
+import {getTestPath, handleWorkerMessage} from './utils';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
@@ -42,46 +44,69 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
     },
   });
 
-  const filePath = path.resolve(process.cwd(), process.argv[2]);
+  const cliOptions = parseCliOptions(process.argv.slice(2), {t: 'testNamePattern'});
 
-  const jsCode = fs.readFileSync(filePath, 'utf-8');
+  const filePatterns = cliOptions[''] || ['**/*.perf.js'];
 
-  const lifecycle = createTestSuiteLifecycle((node) => new Promise((resolve) => {
-    testNode = node;
+  const filePaths = filePatterns?.flatMap((filePattern) => glob.sync(filePattern, {absolute: true}));
 
-    const worker = cluster.fork();
+  if (!filePaths?.length) {
+    // No files to run
+    return;
+  }
 
-    worker.on('message', handleMessage);
-    worker.on('error', (error) => {
-      handlers.onTestFatalError(testNode, error);
-    });
-    worker.on('exit', (exitCode) => {
-      resolve();
-    });
+  const options: TestSuiteLifecycleOptions = {
+    testNamePattern: cliOptions['testNamePattern']?.map((pattern) => RegExp(pattern)),
+  };
 
-    const message: TestLifecycleInitMessage = {
-      type: MessageType.TEST_LIFECYCLE_INIT,
-      filePath,
-      testPath: getTestPath(node),
-    };
+  let filePromise = Promise.resolve();
 
-    worker.send(message);
+  for (const filePath of filePaths) {
 
-  }), handlers);
+    // Read the file contents
+    const jsCode = fs.readFileSync(filePath, 'utf-8');
 
-  const vmContext = vm.createContext(Object.assign({
-    require: createRequire(filePath),
-    __dirname: path.dirname(filePath),
-    __filename: filePath,
-  }, lifecycle.runtime));
+    filePromise = filePromise.then(() => {
 
-  vm.runInContext(jsCode, vmContext, {
-    filename: filePath,
-  });
+      const lifecycle = createTestSuiteLifecycle((node) => new Promise((resolve) => {
+        testNode = node;
 
-  lifecycle.run()
-      .catch((error) => handlers.onTestSuiteError(lifecycle.node, error))
-      .then(() => {
-        process.exit(0);
+        const worker = cluster.fork();
+
+        worker.on('message', handleMessage);
+        worker.on('error', (error) => {
+          handlers.onTestFatalError(testNode, error);
+        });
+        worker.on('exit', (exitCode) => {
+          resolve();
+        });
+
+        const message: TestLifecycleInitMessage = {
+          type: MessageType.TEST_LIFECYCLE_INIT,
+          filePath,
+          testPath: getTestPath(node),
+        };
+
+        worker.send(message);
+
+      }), handlers, options);
+
+      const vmContext = vm.createContext(Object.assign({
+        require: createRequire(filePath),
+        __dirname: path.dirname(filePath),
+        __filename: filePath,
+      }, lifecycle.runtime));
+
+      vm.runInContext(jsCode, vmContext, {
+        filename: filePath,
       });
+
+      return lifecycle.run().catch((error) => handlers.onTestSuiteError(lifecycle.node, error));
+    });
+  }
+
+  // Kill the process after completion
+  filePromise.then(() => {
+    process.exit(0);
+  });
 }

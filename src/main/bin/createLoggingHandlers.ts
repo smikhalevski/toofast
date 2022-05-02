@@ -1,8 +1,8 @@
-import rl from 'readline';
 import {bold, dim, green, red, yellow} from 'kleur/colors';
-import {getErrorMessage, getLabelLength} from './utils';
-import {MasterLifecycleHandlers, Stats} from './bin-types';
+import rl from 'readline';
 import {NodeType} from '../node-types';
+import {MasterLifecycleHandlers, Stats} from './bin-types';
+import {getErrorMessage, getLabelLength} from './utils';
 
 const M_PADDING = '  ';
 const M_PENDING = dim('○ ');

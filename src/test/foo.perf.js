@@ -1,4 +1,4 @@
-const dependencyValue = require('./perf-dependency');
+const dependencyValue = require('./foo-bar');
 
 function factorial(x) {
   if (x < 0) {
