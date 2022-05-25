@@ -1,7 +1,7 @@
 import {bold, dim, green, red, yellow} from 'kleur/colors';
 import rl from 'readline';
 import {NodeType} from '../node-types';
-import {MasterLifecycleHandlers, Stats} from './bin-types';
+import {MasterLifecycleHandlers} from './bin-types';
 import {getErrorMessage, getLabelLength} from './utils';
 
 const M_PADDING = '  ';
@@ -81,15 +81,15 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       );
     },
 
-    onTestEnd(node, durationStats, heapStats) {
+    onTestEnd(node, durationStats, memoryStats) {
       clearLine();
       write(
           M_PADDING.repeat(depth)
           + (errorMessage ? M_ERROR : M_SUCCESS)
           + testLabel
           + M_PADDING
-          + formatDurationStats(durationStats)
-          + (heapStats.size > 0 ? M_PADDING + formatHeapStats(heapStats) : '')
+          + formatMeasurement(durationStats.hz, 'Hz') + formatRme(durationStats.rme)
+          + (memoryStats.mean > 1000 ? M_PADDING + formatMeasurement(memoryStats.mean, 'B') + formatRme(memoryStats.rme) : '')
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
@@ -144,7 +144,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           + testLabel
           + M_PADDING
           + formatMeasureCount(measureCount)
-          + percentFormat.format(percent).padStart(4)
+          + percentFormat.format(percent).padStart(5)
       );
     },
   };
@@ -154,30 +154,27 @@ function formatMeasureCount(count: number): string {
   return count > 0 ? dim(integerFormat.format(count + 1) + 'x') : '';
 }
 
-function formatDurationStats(stats: Stats): string {
-  const hz = stats.hz;
-  const format = hz < 100 ? decimalFormat : integerFormat;
+function formatMeasurement(value: number, unit: string): string {
+  let label = ' ' + unit + ' ';
 
-  return format.format(hz) + dim(' ops/sec ± ' + rmeFormat.format(stats.rme));
+  if (value > 1000) {
+    value /= 1000;
+    label = ' k' + unit;
+  }
+  if (value > 1000) {
+    value /= 1000;
+    label = ' M' + unit;
+  }
+  if (value > 1000) {
+    value /= 1000;
+    label = ' G' + unit;
+  }
+
+  return decimalFormat.format(value).replace(/\D?\d+$/, dim).padStart(5 + dim('').length) + label;
 }
 
-function formatHeapStats(stats: Stats): string {
-  let mean = stats.mean;
-  let label = 'bytes';
-  let format = integerFormat;
-
-  if (mean > 1024) {
-    mean /= 1024;
-    label = 'kB';
-    format = decimalFormat;
-  }
-  if (mean > 1024) {
-    mean /= 1024;
-    label = 'MB';
-    format = decimalFormat;
-  }
-
-  return format.format(mean) + dim(' ' + label + ' ± ' + rmeFormat.format(stats.rme));
+function formatRme(rme: number): string {
+  return dim(' ± ' + rmeFormat.format(rme).padEnd(6));
 }
 
 function clearLine(): void {

@@ -13,9 +13,9 @@ export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
    * Triggered when the `test` block is completed. Not invoked if an error occurred in test lifecycle.
    *
    * @param durationHistogram Tested callback performance statistics across all measurements.
-   * @param heapHistogram
+   * @param memoryHistogram
    */
-  onTestEnd?(durationHistogram: Histogram, heapHistogram: Histogram): void;
+  onTestEnd?(durationHistogram: Histogram, memoryHistogram: Histogram): void;
 }
 
 export interface TestLifecycle {
@@ -92,7 +92,7 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
 
     // Histogram that reflects population across all performance measurements
     const testDurationHistogram = new Histogram();
-    const testHeapHistogram = new Histogram();
+    const testMemoryHistogram = new Histogram();
 
     lifecyclePromise = lifecyclePromise.then(() => {
       testPending = true;
@@ -119,7 +119,7 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
           })
           .then((result) => {
             testDurationHistogram.addFromHistogram(result.durationHistogram);
-            testHeapHistogram.addFromHistogram(result.heapHistogram);
+            testMemoryHistogram.addFromHistogram(result.memoryHistogram);
           });
 
       // Always wait for measure calls to resolve
@@ -129,7 +129,7 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
     lifecyclePromise = lifecyclePromise
         .then(() => callHooks(afterEachHooks))
         .then(() => {
-          onTestEnd?.(testDurationHistogram, testHeapHistogram);
+          onTestEnd?.(testDurationHistogram, testMemoryHistogram);
         });
   };
 

@@ -4,10 +4,10 @@ import {sleep} from './utils';
 
 export interface RunMeasureResult {
   durationHistogram: Histogram;
-  heapHistogram: Histogram;
+  memoryHistogram: Histogram;
 }
 
-export type RunMeasureLifecycle = (cb: () => unknown, handlers?: MeasureLifecycleHandlers, options?: MeasureOptions, durationHistogram?: Histogram, heapHistogram?: Histogram) => Promise<RunMeasureResult>;
+export type RunMeasureLifecycle = (cb: () => unknown, handlers?: MeasureLifecycleHandlers, options?: MeasureOptions, durationHistogram?: Histogram, memoryHistogram?: Histogram) => Promise<RunMeasureResult>;
 
 export interface MeasureLifecycleHandlers {
 
@@ -55,10 +55,10 @@ export interface MeasureLifecycleHandlers {
  * @param handlers Callbacks that are invoked at different lifecycle phases.
  * @param options Other measurement options.
  * @param durationHistogram The histogram to store performance measurements.
- * @param heapHistogram
+ * @param memoryHistogram
  * @returns The promise that is resolved with the results' histogram when measurements are completed.
  */
-export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, options = {}, durationHistogram = new Histogram(), heapHistogram = new Histogram()) => {
+export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, options = {}, durationHistogram = new Histogram(), memoryHistogram = new Histogram()) => {
 
   const {
     onMeasureStart,
@@ -137,7 +137,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
       beforeIteration?.();
 
       const iterationTs = performance.now();
-      const heapUsed = getHepUsed();
+      const memoryUsed = getMemoryUsed();
 
       for (let i = 0; i < syncIterationCount; ++i) {
         ++j;
@@ -150,9 +150,9 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
 
       durationHistogram.add((performance.now() - iterationTs) / syncIterationCount);
 
-      const heapUsedDelta = getHepUsed() - heapUsed;
-      if (heapUsedDelta > 0) {
-        heapHistogram.add(heapUsedDelta / syncIterationCount);
+      const memoryUsedDelta = getMemoryUsed() - memoryUsed;
+      if (memoryUsedDelta > 0) {
+        memoryHistogram.add(memoryUsedDelta / syncIterationCount);
       }
 
       afterIteration?.();
@@ -195,10 +195,10 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
       .then(nextBatch)
       .then(() => {
         onMeasureEnd?.(durationHistogram);
-        return {durationHistogram, heapHistogram};
+        return {durationHistogram, memoryHistogram};
       });
 };
 
-function getHepUsed(): number {
+function getMemoryUsed(): number {
   return typeof process !== 'undefined' ? process.memoryUsage().heapUsed : 0;
 }

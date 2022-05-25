@@ -63,7 +63,7 @@ export interface MasterLifecycleHandlers {
 
   onTestStart(node: TestNode): void;
 
-  onTestEnd(node: TestNode, durationStats: Stats, heapStats: Stats): void;
+  onTestEnd(node: TestNode, durationStats: Stats, memoryStats: Stats): void;
 
   onTestFatalError(node: TestNode, error: any): void;
 
@@ -154,7 +154,7 @@ export interface TestStartMessage {
 export interface TestEndMessage {
   type: MessageType.TEST_END;
   durationStats: Stats;
-  heapStats: Stats;
+  memoryStats: Stats;
 }
 
 export interface TestFatalErrorMessage {

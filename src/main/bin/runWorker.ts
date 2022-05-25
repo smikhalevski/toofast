@@ -5,7 +5,7 @@ import vm from 'vm';
 import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle';
 import {runMeasureLifecycle} from '../runMeasureLifecycle';
 import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
-import {getErrorMessage, toStats, handleMasterMessage} from './utils';
+import {getErrorMessage, handleMasterMessage, toStats} from './utils';
 
 /**
  * Runs worker that waits for test init message and sends lifecycle messages to parent process.
@@ -23,11 +23,11 @@ export function runWorker(): void {
         type: MessageType.TEST_START,
       });
     },
-    onTestEnd(durationHistogram, heapHistogram) {
+    onTestEnd(durationHistogram, memoryHistogram) {
       send({
         type: MessageType.TEST_END,
         durationStats: toStats(durationHistogram),
-        heapStats: toStats(heapHistogram),
+        memoryStats: toStats(memoryHistogram),
       });
     },
     onMeasureWarmupStart() {

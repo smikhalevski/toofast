@@ -11,6 +11,9 @@ npm install --save-dev toofast
 - [`performance`](https://developer.mozilla.org/en-US/docs/Web/API/Performance) is used to measure function execution
   time. Measurements are taken on every function call.
 
+- [`process.memoryUsage().heapUsed`](https://nodejs.org/api/process.html#processmemoryusagerss) is used to measure
+  memory allocated during test execution.
+
 - To measure performance, a function is run multiple times in batches. After each batch a process is idle for some time
   to allow garbage collection to kick in.
 
