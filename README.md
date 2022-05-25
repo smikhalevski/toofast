@@ -18,7 +18,7 @@ npm install --save-dev toofast
   batch.
 
 - [`process.memoryUsage().heapUsed`](https://nodejs.org/api/process.html#processmemoryusagerss) is used to measure
-  memory allocated during test execution. Results are displayed if more than 1 kB of memory was allocated.
+  memory allocated during test execution. Memory measurement results are displayed if more than 1 kB was allocated.
 
 [API documentation is available here.](https://smikhalevski.github.io/toofast/)
 
@@ -54,9 +54,13 @@ toofast
 
 # CLI options
 
-### `--testNamePattern <regex>`
+##### `...files`
 
-Alias `-t <regex>`. Run only tests with a name that matches the regex. This option can be specified multiple times.
+The list of file paths that contain tests. Defaults to `**/*.perf.js`.
+
+##### `-t <regex>`, `--testNamePattern <regex>`
+
+Run only tests with a name that matches the regex. This option can be specified multiple times.
 
 The regex is matched against the full name, which is a combination of the test label and all its enclosing describe
 blocks.
@@ -144,10 +148,9 @@ describe('my function', () => {
 });
 ```
 
-## Hooks
+### `beforeEach`, `afterEach`, `afterWarmup`, `beforeBatch`, `afterBatch`, `beforeIteration`, and `afterIteration`
 
-Hooks are callbacks that are invoked at different phases of the performance test lifecycle: `beforeEach`, `afterEach`
-, `afterWarmup`, `beforeBatch`, `afterBatch`, `beforeIteration`, and `afterIteration`.
+Hooks register callbacks that are invoked at different phases of the performance test lifecycle.
 
 ```ts
 describe('my function', () => {
