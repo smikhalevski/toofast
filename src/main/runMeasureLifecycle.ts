@@ -123,6 +123,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
   }
 
   let i = 0; // Total iteration count
+  let progress = 0;
 
   const measureTs = Date.now();
 
@@ -169,11 +170,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
         return Promise.resolve(afterBatch?.());
       }
 
-      if (i > 2) {
-        onMeasureProgress?.(Math.max(measureDuration / measureTimeout, targetRme / rme) || 0);
-      } else {
-        onMeasureProgress?.(measureDuration / measureTimeout || 0);
-      }
+      onMeasureProgress?.(progress = Math.max(progress, measureDuration / measureTimeout || 0, i > 2 ? targetRme / rme || 0 : 0));
 
       if (Date.now() - batchTs > batchTimeout || j >= batchIterationCount) {
 
