@@ -1,4 +1,4 @@
-# TooFast [![build](https://github.com/smikhalevski/toofast/actions/workflows/master.yml/badge.svg?branch=master&event=push)](https://github.com/smikhalevski/toofast/actions/workflows/master.yml)
+# TooFast&ensp;🚗💨&ensp;[![build](https://github.com/smikhalevski/toofast/actions/workflows/master.yml/badge.svg?branch=master&event=push)](https://github.com/smikhalevski/toofast/actions/workflows/master.yml)
 
 The Node.js performance testing tool with unit-test-like API.
 
@@ -16,6 +16,9 @@ npm install --save-dev toofast
 
 - Before performance is measured a warmup run of the tested function is done. Warmup is always completed in a single
   batch.
+
+- [`process.memoryUsage().heapUsed`](https://nodejs.org/api/process.html#processmemoryusagerss) is used to measure
+  memory allocated during test execution. Results are displayed if more than 1 kB of memory was allocated.
 
 [API documentation is available here.](https://smikhalevski.github.io/toofast/)
 
@@ -102,13 +105,23 @@ measure(() => {
 
 Following options are available:
 
-- `measureTimeout = 10_000` Maximum measure duration. Doesn't include the duration of warmup iterations.
-- `targetRme = 0.002` The maximum relative margin of error that must be reached for each measurement [0, 1].
-- `warmupIterationCount = 1` The maximum number of warmup iterations that are run before each measurement.
-- `batchIterationCount = Infinity` The maximum number of iterations in a batch.
-- `batchTimeout = 1_000` The maximum duration of batched measurements.
-- `batchIntermissionTimeout = 200` The delay between batched measurements. VM is expected to run garbage collector
-  during this delay.
+- `measureTimeout` = 10 000<br>
+  The maximum measure duration. Doesn't include the duration of warmup iterations.
+
+- `targetRme` = 0.002<br>
+  The maximum relative margin of error that must be reached for each measurement [0, 1].
+
+- `warmupIterationCount` = 1<br>
+  The maximum number of warmup iterations that are run before each measurement.
+
+- `batchIterationCount` = Infinity<br>
+  The maximum number of iterations in a batch.
+
+- `batchTimeout` = 1 000<br>
+  The maximum duration of batched measurements.
+
+- `batchIntermissionTimeout` = 200<br>
+  The delay between batched measurements. VM is expected to run garbage collector during this delay.
 
 ### `describe`
 

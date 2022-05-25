@@ -2,7 +2,7 @@ import {createTestLifecycle, Histogram, runMeasureLifecycle, TestLifecycleHandle
 
 describe('createTestLifecycle', () => {
 
-  const runMeasureLifecycleMock = jest.fn(() => Promise.resolve(new Histogram()));
+  const runMeasureLifecycleMock = jest.fn(() => Promise.resolve({durationHistogram: new Histogram(), memoryHistogram: new Histogram()}));
 
   const onTestStartMock = jest.fn();
   const onTestEndMock = jest.fn();

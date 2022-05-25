@@ -1,7 +1,7 @@
 import {bold, dim, green, red, yellow} from 'kleur/colors';
 import rl from 'readline';
 import {NodeType} from '../node-types';
-import {MasterLifecycleHandlers, Stats} from './bin-types';
+import {MasterLifecycleHandlers} from './bin-types';
 import {getErrorMessage, getLabelLength} from './utils';
 
 const M_PADDING = '  ';
@@ -11,9 +11,9 @@ const M_WARMUP = yellow('○ ');
 const M_ERROR = red('● ');
 const M_SUCCESS = green('● ');
 
-const numberFormat = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+const decimalFormat = new Intl.NumberFormat('en', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
   useGrouping: true,
 });
 
@@ -81,14 +81,15 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       );
     },
 
-    onTestEnd(node, stats) {
+    onTestEnd(node, durationStats, memoryStats) {
       clearLine();
       write(
           M_PADDING.repeat(depth)
           + (errorMessage ? M_ERROR : M_SUCCESS)
           + testLabel
           + M_PADDING
-          + formatStats(stats)
+          + formatMeasurement(durationStats.hz, 'Hz') + formatRme(durationStats.rme)
+          + (memoryStats.mean > 1000 ? M_PADDING + formatMeasurement(memoryStats.mean, 'B') + formatRme(memoryStats.rme) : '')
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
@@ -143,7 +144,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           + testLabel
           + M_PADDING
           + formatMeasureCount(measureCount)
-          + percentFormat.format(percent).padStart(4)
+          + percentFormat.format(percent).padStart(5)
       );
     },
   };
@@ -153,8 +154,27 @@ function formatMeasureCount(count: number): string {
   return count > 0 ? dim(integerFormat.format(count + 1) + 'x') : '';
 }
 
-function formatStats(stats: Stats): string {
-  return numberFormat.format(stats.hz) + dim(' ops/sec ± ' + rmeFormat.format(stats.rme));
+function formatMeasurement(value: number, unit: string): string {
+  let label = ' ' + unit + ' ';
+
+  if (value > 1000) {
+    value /= 1000;
+    label = ' k' + unit;
+  }
+  if (value > 1000) {
+    value /= 1000;
+    label = ' M' + unit;
+  }
+  if (value > 1000) {
+    value /= 1000;
+    label = ' G' + unit;
+  }
+
+  return decimalFormat.format(value).replace(/\D?\d+$/, dim).padStart(5 + dim('').length) + label;
+}
+
+function formatRme(rme: number): string {
+  return dim(' ± ' + rmeFormat.format(rme).padEnd(6));
 }
 
 function clearLine(): void {

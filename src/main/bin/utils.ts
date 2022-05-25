@@ -59,7 +59,7 @@ export function handleMasterMessage(message: MasterMessage, handlers: MasterMess
   }
 }
 
-export function getStats(histogram: Histogram): Stats {
+export function toStats(histogram: Histogram): Stats {
   return {
     size: histogram.size,
     mean: histogram.getMean(),

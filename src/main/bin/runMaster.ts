@@ -19,7 +19,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
       handlers.onTestStart(testNode);
     },
     onTestEndMessage(message) {
-      handlers.onTestEnd(testNode, message.stats);
+      handlers.onTestEnd(testNode, message.durationStats, message.memoryStats);
     },
     onTestFatalErrorMessage(message) {
       handlers.onTestFatalError(testNode, message.message);
@@ -77,9 +77,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
         worker.on('error', (error) => {
           handlers.onTestFatalError(testNode, error);
         });
-        worker.on('exit', (exitCode) => {
-          resolve();
-        });
+        worker.on('exit', resolve);
 
         const message: TestLifecycleInitMessage = {
           type: MessageType.TEST_LIFECYCLE_INIT,

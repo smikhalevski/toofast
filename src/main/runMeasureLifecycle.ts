@@ -2,6 +2,13 @@ import {Histogram} from './Histogram';
 import {MeasureOptions} from './test-types';
 import {sleep} from './utils';
 
+export interface RunMeasureResult {
+  durationHistogram: Histogram;
+  memoryHistogram: Histogram;
+}
+
+export type RunMeasureLifecycle = (cb: () => unknown, handlers?: MeasureLifecycleHandlers, options?: MeasureOptions, durationHistogram?: Histogram, memoryHistogram?: Histogram) => Promise<RunMeasureResult>;
+
 export interface MeasureLifecycleHandlers {
 
   /**
@@ -47,10 +54,11 @@ export interface MeasureLifecycleHandlers {
  * @param cb The measured callback.
  * @param handlers Callbacks that are invoked at different lifecycle phases.
  * @param options Other measurement options.
- * @param histogram The histogram to store performance measurements.
+ * @param durationHistogram The histogram to store performance measurements.
+ * @param memoryHistogram
  * @returns The promise that is resolved with the results' histogram when measurements are completed.
  */
-export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycleHandlers = {}, options: MeasureOptions = {}, histogram = new Histogram()): Promise<Histogram> {
+export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, options = {}, durationHistogram = new Histogram(), memoryHistogram = new Histogram()) => {
 
   const {
     onMeasureStart,
@@ -115,6 +123,7 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
   }
 
   let i = 0; // Total iteration count
+  let progress = 0;
 
   const measureTs = Date.now();
 
@@ -129,6 +138,8 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
       beforeIteration?.();
 
       const iterationTs = performance.now();
+      const memoryUsed = getMemoryUsed();
+
       for (let i = 0; i < syncIterationCount; ++i) {
         ++j;
         try {
@@ -137,14 +148,20 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
           onMeasureError?.(error);
         }
       }
-      histogram.add((performance.now() - iterationTs) / syncIterationCount);
+
+      durationHistogram.add((performance.now() - iterationTs) / syncIterationCount);
+
+      const memoryUsedDelta = getMemoryUsed() - memoryUsed;
+      if (memoryUsedDelta > 0) {
+        memoryHistogram.add(memoryUsedDelta / syncIterationCount);
+      }
 
       afterIteration?.();
 
       ++i;
 
       const measureDuration = Date.now() - measureTs;
-      const rme = histogram.getRme();
+      const rme = durationHistogram.getRme();
 
       if (measureDuration > measureTimeout || i > 2 && targetRme >= rme) {
         onMeasureProgress?.(1);
@@ -153,11 +170,7 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
         return Promise.resolve(afterBatch?.());
       }
 
-      if (i > 2) {
-        onMeasureProgress?.(Math.max(measureDuration / measureTimeout, targetRme / rme) || 0);
-      } else {
-        onMeasureProgress?.(measureDuration / measureTimeout || 0);
-      }
+      onMeasureProgress?.(progress = Math.max(progress, measureDuration / measureTimeout || 0, i > 2 ? targetRme / rme || 0 : 0));
 
       if (Date.now() - batchTs > batchTimeout || j >= batchIterationCount) {
 
@@ -178,7 +191,11 @@ export function runMeasureLifecycle(cb: () => unknown, handlers: MeasureLifecycl
       .then(() => onMeasureProgress?.(0))
       .then(nextBatch)
       .then(() => {
-        onMeasureEnd?.(histogram);
-        return histogram;
+        onMeasureEnd?.(durationHistogram);
+        return {durationHistogram, memoryHistogram};
       });
+};
+
+function getMemoryUsed(): number {
+  return typeof process !== 'undefined' ? process.memoryUsage().heapUsed : 0;
 }
