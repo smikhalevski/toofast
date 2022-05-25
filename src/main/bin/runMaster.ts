@@ -19,7 +19,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
       handlers.onTestStart(testNode);
     },
     onTestEndMessage(message) {
-      handlers.onTestEnd(testNode, message.stats);
+      handlers.onTestEnd(testNode, message.durationStats, message.heapStats);
     },
     onTestFatalErrorMessage(message) {
       handlers.onTestFatalError(testNode, message.message);

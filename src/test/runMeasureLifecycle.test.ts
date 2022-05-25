@@ -105,7 +105,7 @@ describe('runMeasureLifecycle', () => {
     const beforeIterationMock = jest.fn();
     const afterIterationMock = jest.fn();
 
-    const histogram = await runMeasureLifecycle(() => undefined, handlers, {
+    const {durationHistogram} = await runMeasureLifecycle(() => undefined, handlers, {
       measureTimeout: 100,
       warmupIterationCount: 0,
       batchIntermissionTimeout: 0,
@@ -116,32 +116,32 @@ describe('runMeasureLifecycle', () => {
       afterIteration: afterIterationMock,
     });
 
-    expect(histogram.size).toBeGreaterThan(500);
+    expect(durationHistogram.size).toBeGreaterThan(500);
     expect(beforeBatchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(afterBatchMock.mock.calls.length).toBe(beforeBatchMock.mock.calls.length);
-    expect(beforeIterationMock).toHaveBeenCalledTimes(histogram.size);
-    expect(afterIterationMock).toHaveBeenCalledTimes(histogram.size);
+    expect(beforeIterationMock).toHaveBeenCalledTimes(durationHistogram.size);
+    expect(afterIterationMock).toHaveBeenCalledTimes(durationHistogram.size);
 
     expect(onMeasureWarmupStartMock).not.toHaveBeenCalled();
     expect(onMeasureWarmupEndMock).not.toHaveBeenCalled();
     expect(onMeasureStartMock).toHaveBeenCalledTimes(1);
     expect(onMeasureEndMock).toHaveBeenCalledTimes(1);
     expect(onMeasureErrorMock).not.toHaveBeenCalled();
-    expect(onMeasureProgressMock).toHaveBeenCalledTimes(histogram.size + 1);
+    expect(onMeasureProgressMock).toHaveBeenCalledTimes(durationHistogram.size + 1);
 
     expect(onMeasureProgressMock).toHaveBeenNthCalledWith(1, 0);
     expect(onMeasureProgressMock).toHaveBeenLastCalledWith(1)
   });
 
   test('captures errors in measured callback', async () => {
-    const histogram = await runMeasureLifecycle(() => {
+    const {durationHistogram} = await runMeasureLifecycle(() => {
       throw new Error();
     }, handlers, {
       measureTimeout: 10,
       warmupIterationCount: 0,
     });
 
-    expect(histogram.size).toBeGreaterThan(100);
-    expect(onMeasureErrorMock).toHaveBeenCalledTimes(histogram.size);
+    expect(durationHistogram.size).toBeGreaterThan(50);
+    expect(onMeasureErrorMock).toHaveBeenCalledTimes(durationHistogram.size);
   });
 });

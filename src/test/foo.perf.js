@@ -13,11 +13,19 @@ function factorial(x) {
 describe('describe 0', () => {
 
   test('test 0.0', (measure) => {
-    measure(() => factorial(30));
+    measure(() => {
+      factorial(30);
+    });
   });
 
   test('test 0.1 (' + dependencyValue + ')', (measure) => {
-    measure(() => 'a' + 'b');
+    let str = [];
+    measure(() => {
+      if (str.length > 10000) {
+        str = [];
+      }
+      str.push({});
+    });
   });
 
   describe('describe 0.1', () => {
@@ -29,7 +37,9 @@ describe('describe 0', () => {
     });
 
     test('test 0.1.1', (measure) => {
-      measure(() => 'a' + 'b');
+      measure(() => {
+        // noop
+      });
     });
   });
 
@@ -59,10 +69,14 @@ describe('describe 0', () => {
 describe('describe 1', () => {
 
   test('test 1.0', (measure) => {
-    measure(() => factorial(30));
+    measure(() => {
+      factorial(30)
+    });
   });
 
   test('test 1.1', (measure) => {
-    measure(() => 'a' + 'b');
+    measure(() => {
+      // noop
+    });
   });
 });

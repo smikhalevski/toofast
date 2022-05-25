@@ -11,9 +11,9 @@ const M_WARMUP = yellow('○ ');
 const M_ERROR = red('● ');
 const M_SUCCESS = green('● ');
 
-const numberFormat = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
+const decimalFormat = new Intl.NumberFormat('en', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
   useGrouping: true,
 });
 
@@ -81,14 +81,15 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       );
     },
 
-    onTestEnd(node, stats) {
+    onTestEnd(node, durationStats, heapStats) {
       clearLine();
       write(
           M_PADDING.repeat(depth)
           + (errorMessage ? M_ERROR : M_SUCCESS)
           + testLabel
           + M_PADDING
-          + formatStats(stats)
+          + formatDurationStats(durationStats)
+          + (heapStats.size > 0 ? M_PADDING + formatHeapStats(heapStats) : '')
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
@@ -153,8 +154,30 @@ function formatMeasureCount(count: number): string {
   return count > 0 ? dim(integerFormat.format(count + 1) + 'x') : '';
 }
 
-function formatStats(stats: Stats): string {
-  return numberFormat.format(stats.hz) + dim(' ops/sec ± ' + rmeFormat.format(stats.rme));
+function formatDurationStats(stats: Stats): string {
+  const hz = stats.hz;
+  const format = hz < 100 ? decimalFormat : integerFormat;
+
+  return format.format(hz) + dim(' ops/sec ± ' + rmeFormat.format(stats.rme));
+}
+
+function formatHeapStats(stats: Stats): string {
+  let mean = stats.mean;
+  let label = 'bytes';
+  let format = integerFormat;
+
+  if (mean > 1024) {
+    mean /= 1024;
+    label = 'kB';
+    format = decimalFormat;
+  }
+  if (mean > 1024) {
+    mean /= 1024;
+    label = 'MB';
+    format = decimalFormat;
+  }
+
+  return format.format(mean) + dim(' ' + label + ' ± ' + rmeFormat.format(stats.rme));
 }
 
 function clearLine(): void {

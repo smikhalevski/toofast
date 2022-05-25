@@ -1,8 +1,6 @@
 import {Histogram} from './Histogram';
-import {MeasureLifecycleHandlers, runMeasureLifecycle} from './runMeasureLifecycle';
+import {MeasureLifecycleHandlers, RunMeasureLifecycle} from './runMeasureLifecycle';
 import {Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test} from './test-types';
-
-export type RunMeasureLifecycle = typeof runMeasureLifecycle;
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
 
@@ -14,9 +12,10 @@ export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
    * Triggered when the `test` block is completed. Not invoked if an error occurred in test lifecycle.
    *
-   * @param histogram Tested callback performance statistics across all measurements.
+   * @param durationHistogram Tested callback performance statistics across all measurements.
+   * @param heapHistogram
    */
-  onTestEnd?(histogram: Histogram): void;
+  onTestEnd?(durationHistogram: Histogram, heapHistogram: Histogram): void;
 }
 
 export interface TestLifecycle {
@@ -92,7 +91,8 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
     Object.assign(measureOptions, options);
 
     // Histogram that reflects population across all performance measurements
-    const testHistogram = new Histogram();
+    const testDurationHistogram = new Histogram();
+    const testHeapHistogram = new Histogram();
 
     lifecyclePromise = lifecyclePromise.then(() => {
       testPending = true;
@@ -117,8 +117,9 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
 
             return runMeasureLifecycle(cb, handlers, options);
           })
-          .then((histogram) => {
-            testHistogram.addFromHistogram(histogram);
+          .then((result) => {
+            testDurationHistogram.addFromHistogram(result.durationHistogram);
+            testHeapHistogram.addFromHistogram(result.heapHistogram);
           });
 
       // Always wait for measure calls to resolve
@@ -128,7 +129,7 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
     lifecyclePromise = lifecyclePromise
         .then(() => callHooks(afterEachHooks))
         .then(() => {
-          onTestEnd?.(testHistogram);
+          onTestEnd?.(testDurationHistogram, testHeapHistogram);
         });
   };
 
