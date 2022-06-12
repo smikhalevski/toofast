@@ -128,7 +128,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (cb, handlers = {}, opti
   const measureTs = Date.now();
 
   const nextBatch = (): Promise<void> | void => {
-    syncIterationCount ||= 1;
+    syncIterationCount = Math.max(1, Math.min(syncIterationCount || 1 | 0 , 1000));
 
     const batchTs = Date.now();
 
