@@ -56,7 +56,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
   }
 
   const options: TestSuiteLifecycleOptions = {
-    testNamePatterns: cliOptions['testNamePattern']?.map((pattern) => RegExp(pattern)),
+    testNamePatterns: cliOptions['testNamePattern']?.map((pattern) => RegExp(pattern, 'i')),
   };
 
   let filePromise = Promise.resolve();
