@@ -1,6 +1,16 @@
 import { Histogram } from './Histogram';
 import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle';
-import { Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test, TestCallback } from './test-types';
+import {
+  Describe,
+  Hook,
+  Measure,
+  MeasureOptions,
+  Runtime,
+  SyncHook,
+  Test,
+  TestCallback,
+  TestOptions,
+} from './test-types';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
@@ -37,13 +47,15 @@ export interface TestLifecycle {
  * @param testPath Indices of describe and test DSL blocks that must be run.
  * @param runMeasureLifecycle Measures callback performance.
  * @param handlers Callbacks that are invoked at different lifecycle stages.
+ * @param measureOptions The default measure options.
  *
  * @see {@linkcode runMeasureLifecycle}
  */
 export function createTestLifecycle(
   testPath: readonly number[],
   runMeasureLifecycle: RunMeasureLifecycle,
-  handlers: TestLifecycleHandlers = {}
+  handlers: TestLifecycleHandlers = {},
+  measureOptions: TestOptions = {}
 ): TestLifecycle {
   const { onTestStart, onTestEnd } = handlers;
 
@@ -65,7 +77,7 @@ export function createTestLifecycle(
 
   let testPending = false;
 
-  const measureOptions: MeasureOptions = {};
+  measureOptions = Object.assign({}, measureOptions);
 
   const describe: Describe = function () {
     if (testPending || i >= testPath.length - 1 || j !== testPath[i]) {

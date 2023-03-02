@@ -1,4 +1,22 @@
 import { DescribeNode, TestNode, TestSuiteNode } from '../node-types';
+import { TestOptions } from '../test-types';
+
+export interface Config {
+  /**
+   * The default test options.
+   */
+  testOptions?: TestOptions;
+
+  /**
+   * The array of glob patterns of included test files.
+   */
+  include?: string[];
+
+  /**
+   * The array of glob patters of files that are evaluated in the test environment before any test suites are run.
+   */
+  setupFiles?: string[];
+}
 
 /**
  * Population statistics passed between master and fork processes.
@@ -140,6 +158,8 @@ export interface TestLifecycleInitMessage {
   type: MessageType.TEST_LIFECYCLE_INIT;
   filePath: string;
   testPath: number[];
+  setupFilePaths: string[] | undefined;
+  testOptions: TestOptions | undefined;
 }
 
 export interface TestStartMessage {
