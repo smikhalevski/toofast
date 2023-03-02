@@ -1,15 +1,12 @@
-import {createTestSuiteLifecycle, DescribeNode, TestNode} from '../../main';
-import {getLabelLength, getTestPath} from '../../main/bin/utils';
+import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main';
+import { getLabelLength, getTestPath } from '../../main/bin/utils';
 
 describe('getTestPath', () => {
-
   test('returns path of the nested test', () => {
-
     const lifecycle = createTestSuiteLifecycle(() => Promise.resolve());
     const r = lifecycle.runtime;
 
     r.describe('0', () => {
-
       r.test('0.0', () => undefined);
 
       r.test('0.1', () => undefined);
@@ -21,14 +18,11 @@ describe('getTestPath', () => {
 });
 
 describe('getLabelLength', () => {
-
   test('returns the maximum label length', () => {
-
     const lifecycle = createTestSuiteLifecycle(() => Promise.resolve());
     const r = lifecycle.runtime;
 
     r.describe('', () => {
-
       r.test('aaaaaa', () => undefined);
 
       r.test('bbb', () => undefined);

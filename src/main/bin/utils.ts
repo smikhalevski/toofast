@@ -1,17 +1,16 @@
-import {Histogram} from '../Histogram';
-import {DescribeNode, NodeType, TestNode} from '../node-types';
+import { Histogram } from '../Histogram';
+import { DescribeNode, NodeType, TestNode } from '../node-types';
 import {
   MasterMessage,
   MasterMessageHandlers,
   MessageType,
   Stats,
   WorkerMessage,
-  WorkerMessageHandlers
+  WorkerMessageHandlers,
 } from './bin-types';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {
-
     case MessageType.TEST_START:
       handlers.onTestStartMessage(message);
       return true;
@@ -52,7 +51,6 @@ export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMess
 
 export function handleMasterMessage(message: MasterMessage, handlers: MasterMessageHandlers): true {
   switch (message.type) {
-
     case MessageType.TEST_LIFECYCLE_INIT:
       handlers.onTestLifecycleInitMessage(message);
       return true;

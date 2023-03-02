@@ -1,14 +1,12 @@
 {
   "compilerOptions": {
-    "declaration": true,
-    "esModuleInterop": true,
+    "skipLibCheck": true,
     "moduleResolution": "Node",
-    "preserveConstEnums": true,
+    "esModuleInterop": true,
+    "noUnusedLocals": true,
     "strict": true,
     "target": "ES5",
-    "module": "ES6",
-    "rootDir": "./src/main",
-    "outDir": "./lib"
+    "module": "ES6"
   },
   "include": [
     "./src/main/**/*"

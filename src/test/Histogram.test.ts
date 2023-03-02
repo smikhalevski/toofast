@@ -1,7 +1,6 @@
-import {Histogram} from '../main';
+import { Histogram } from '../main';
 
 describe('Histogram', () => {
-
   test('creates a blank histogram', () => {
     const histogram = new Histogram();
 

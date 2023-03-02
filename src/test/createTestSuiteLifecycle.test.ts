@@ -4,11 +4,10 @@ import {
   NodeType,
   TestNode,
   TestSuiteLifecycleHandlers,
-  TestSuiteNode
+  TestSuiteNode,
 } from '../main';
 
 describe('createTestSuiteLifecycle', () => {
-
   const testLifecycleMock = jest.fn(() => Promise.resolve());
 
   const onDescribeStartMock = jest.fn();
@@ -126,7 +125,6 @@ describe('createTestSuiteLifecycle', () => {
   });
 
   test('runs the lifecycle', async () => {
-
     const lifecycle = createTestSuiteLifecycle(testLifecycleMock, handlers);
 
     const r = lifecycle.runtime;

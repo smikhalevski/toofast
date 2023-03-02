@@ -6,14 +6,31 @@ export type SyncHook = () => void;
 
 export type MountSyncHook = (hook: SyncHook) => void;
 
-export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
+// export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
 
-export type Measure = (cb: () => unknown, options?: MeasureOptions) => Promise<void>;
+// export type Measure = (cb: () => unknown, options?: MeasureOptions) => Promise<void>;
 
-export type Test = (label: string, cb: (measure: Measure) => PromiseLike<void> | void, options?: TestOptions) => void;
+export interface Describe {
+  (label: string, cb: () => void): void;
+
+  (label: string, options: TestOptions, cb: () => void): void;
+}
+
+export interface Test {
+  (label: string, cb: TestCallback): void;
+
+  (label: string, options: TestOptions, cb: TestCallback): void;
+}
+
+export type TestCallback = (measure: Measure) => PromiseLike<void> | void;
+
+export interface Measure {
+  (cb: () => unknown): Promise<void>;
+
+  (options: MeasureOptions, cb: () => unknown): Promise<void>;
+}
 
 export interface TestOptions {
-
   /**
    * Maximum measure duration. Doesn't include the duration of warmup iterations.
    *
@@ -89,15 +106,12 @@ export interface Runtime {
   test: Test;
 }
 
-declare global {
-  // TODO Consider renaming to avoid clash with Jest types
-  // let beforeEach: MountHook;
-  // let afterEach: MountHook;
-  let afterWarmup: MountHook;
-  let beforeBatch: MountHook;
-  let afterBatch: MountHook;
-  let beforeIteration: MountSyncHook;
-  let afterIteration: MountSyncHook;
-  // let describe: Describe;
-  // let test: Test;
-}
+declare const beforeEach: MountHook;
+declare const afterEach: MountHook;
+declare const afterWarmup: MountHook;
+declare const beforeBatch: MountHook;
+declare const afterBatch: MountHook;
+declare const beforeIteration: MountSyncHook;
+declare const afterIteration: MountSyncHook;
+declare const describe: Describe;
+declare const test: Test;

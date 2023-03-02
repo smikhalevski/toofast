@@ -1,10 +1,9 @@
-import {DescribeNode, TestNode, TestSuiteNode} from '../node-types';
+import { DescribeNode, TestNode, TestSuiteNode } from '../node-types';
 
 /**
  * Population statistics passed between master and fork processes.
  */
 export interface Stats {
-
   /**
    * The total number of measurements in the population.
    */
@@ -56,7 +55,6 @@ export interface Stats {
 }
 
 export interface MasterLifecycleHandlers {
-
   onDescribeStart(node: DescribeNode): void;
 
   onDescribeEnd(node: DescribeNode): void;
@@ -86,7 +84,6 @@ export interface MasterLifecycleHandlers {
  * Handles messages sent from the worker to the master.
  */
 export interface WorkerMessageHandlers {
-
   onTestStartMessage(message: TestStartMessage): void;
 
   onTestEndMessage(message: TestEndMessage): void;
@@ -110,35 +107,33 @@ export interface WorkerMessageHandlers {
  * Handles messages sent from the master to the worker.
  */
 export interface MasterMessageHandlers {
-
   onTestLifecycleInitMessage(message: TestLifecycleInitMessage): void;
 }
 
 export type WorkerMessage =
-    | TestStartMessage
-    | TestEndMessage
-    | TestFatalErrorMessage
-    | MeasureWarmupStartMessage
-    | MeasureWarmupEndMessage
-    | MeasureStartMessage
-    | MeasureEndMessage
-    | MeasureErrorMessage
-    | MeasureProgressMessage;
+  | TestStartMessage
+  | TestEndMessage
+  | TestFatalErrorMessage
+  | MeasureWarmupStartMessage
+  | MeasureWarmupEndMessage
+  | MeasureStartMessage
+  | MeasureEndMessage
+  | MeasureErrorMessage
+  | MeasureProgressMessage;
 
-export type MasterMessage =
-    | TestLifecycleInitMessage
+export type MasterMessage = TestLifecycleInitMessage;
 
 export const enum MessageType {
-   TEST_LIFECYCLE_INIT = 'testLifecycleInit',
-   TEST_START = 'testStart',
-   TEST_END = 'testEnd',
-   TEST_FATAL_ERROR = 'testFatalError',
-   MEASURE_WARMUP_START = 'measureWarmupStart',
-   MEASURE_WARMUP_END = 'measureWarmupEnd',
-   MEASURE_START = 'measureStart',
-   MEASURE_END = 'measureEnd',
-   MEASURE_ERROR = 'measureError',
-   MEASURE_PROGRESS = 'measureProgress',
+  TEST_LIFECYCLE_INIT = 'testLifecycleInit',
+  TEST_START = 'testStart',
+  TEST_END = 'testEnd',
+  TEST_FATAL_ERROR = 'testFatalError',
+  MEASURE_WARMUP_START = 'measureWarmupStart',
+  MEASURE_WARMUP_END = 'measureWarmupEnd',
+  MEASURE_START = 'measureStart',
+  MEASURE_END = 'measureEnd',
+  MEASURE_ERROR = 'measureError',
+  MEASURE_PROGRESS = 'measureProgress',
 }
 
 export interface TestLifecycleInitMessage {
