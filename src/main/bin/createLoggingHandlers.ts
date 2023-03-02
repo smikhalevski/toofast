@@ -89,7 +89,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
           + testLabel
           + M_PADDING
           + formatMeasurement(durationStats.hz, 'Hz') + formatRme(durationStats.rme)
-          + (memoryStats.mean > 1000 ? M_PADDING + formatMeasurement(memoryStats.mean, 'B') + formatRme(memoryStats.rme) : '')
+          + M_PADDING + formatMeasurement(memoryStats.mean, 'B') + formatRme(memoryStats.rme)
           + '\n'
           + (errorMessage ? red(errorMessage) : '')
       );
