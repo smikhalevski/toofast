@@ -11,14 +11,13 @@ function factorial(x) {
 }
 
 describe('describe 0', () => {
-
-  test('test 0.0', (measure) => {
+  test('test 0.0', measure => {
     measure(() => {
       factorial(30);
     });
   });
 
-  test('test 0.1 (' + dependencyValue + ')', (measure) => {
+  test('test 0.1 (' + dependencyValue + ')', measure => {
     let str = [];
     measure(() => {
       if (str.length > 10000) {
@@ -29,14 +28,13 @@ describe('describe 0', () => {
   });
 
   describe('describe 0.1', () => {
-
-    test('test 0.1.0 (error)', (measure) => {
+    test('test 0.1.0 (error)', measure => {
       measure(() => {
         throw new Error('Expected error');
       });
     });
 
-    test('test 0.1.1', (measure) => {
+    test('test 0.1.1', measure => {
       measure(() => {
         // noop
       });
@@ -44,37 +42,33 @@ describe('describe 0', () => {
   });
 
   describe('describe 0.2', () => {
-
     test('test 0.2.0 (stack overflow)', () => {
       const stackOverflow = () => stackOverflow();
       stackOverflow();
     });
 
-    test('test 0.2.1 (multiple measurements)', (measure) => {
+    test('test 0.2.1 (multiple measurements)', measure => {
+      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
 
-      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
+      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
 
-      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
-
-      measure(() => 'a' + 'b', {measureTimeout: 5_000, targetRme: 0});
+      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
     });
   });
 
-  test('test 0.1.2 (long warmup)', (measure) => {
-    measure(() => 'a' + 'b', {warmupIterationCount: 1000_000_000});
+  test('test 0.1.2 (long warmup)', measure => {
+    measure(() => 'a' + 'b', { warmupIterationCount: 1000_000_000 });
   });
-
 });
 
 describe('describe 1', () => {
-
-  test('test 1.0', (measure) => {
+  test('test 1.0', measure => {
     measure(() => {
-      factorial(30)
+      factorial(30);
     });
   });
 
-  test('test 1.1', (measure) => {
+  test('test 1.1', measure => {
     measure(() => {
       // noop
     });

@@ -5,7 +5,6 @@
  * @see {@link https://en.wikipedia.org/wiki/Kahan_summation_algorithm Kahan summation algorithm on Wikipedia}
  */
 export class Adder {
-
   private _sum = 0;
   private _c = 0;
 
@@ -22,7 +21,7 @@ export class Adder {
    * @param x The measurement value.
    */
   public add(x: number): void {
-    const {_sum} = this;
+    const { _sum } = this;
     const t = _sum + x;
 
     this._c += Math.abs(_sum) < Math.abs(x) ? x - t + _sum : _sum - t + x;

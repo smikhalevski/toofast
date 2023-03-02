@@ -1,7 +1,6 @@
-import {MeasureLifecycleHandlers, runMeasureLifecycle} from '../main';
+import { MeasureLifecycleHandlers, runMeasureLifecycle } from '../main';
 
 describe('runMeasureLifecycle', () => {
-
   const onMeasureWarmupStartMock = jest.fn();
   const onMeasureWarmupEndMock = jest.fn();
   const onMeasureStartMock = jest.fn();
@@ -28,13 +27,13 @@ describe('runMeasureLifecycle', () => {
   });
 
   test('returns a Promise', () => {
-    expect(runMeasureLifecycle(() => undefined, handlers, {measureTimeout: -1})).toBeInstanceOf(Promise);
+    expect(runMeasureLifecycle(() => undefined, handlers, { measureTimeout: -1 })).toBeInstanceOf(Promise);
   });
 
   test('invokes a callback', async () => {
     const cbMock = jest.fn();
 
-    await runMeasureLifecycle(cbMock, handlers, {warmupIterationCount: 0, measureTimeout: -1});
+    await runMeasureLifecycle(cbMock, handlers, { warmupIterationCount: 0, measureTimeout: -1 });
 
     expect(cbMock).toHaveBeenCalledTimes(1);
   });
@@ -51,7 +50,7 @@ describe('runMeasureLifecycle', () => {
     expect(afterWarmupMock).toHaveBeenCalledTimes(1);
   });
 
-  test('respects warmupIterationCount', (done) => {
+  test('respects warmupIterationCount', done => {
     const cbMock = jest.fn();
     const beforeIterationMock = jest.fn();
     const afterIterationMock = jest.fn();
@@ -77,22 +76,26 @@ describe('runMeasureLifecycle', () => {
     await runMeasureLifecycle(() => undefined, handlers, {
       warmupIterationCount: 0,
       measureTimeout: -1,
-      afterWarmup: afterWarmupMock
+      afterWarmup: afterWarmupMock,
     });
 
     expect(afterWarmupMock).not.toHaveBeenCalled();
   });
 
   test('triggers onError', async () => {
-    await runMeasureLifecycle(() => {
-      throw new Error();
-    }, handlers, {measureTimeout: -1});
+    await runMeasureLifecycle(
+      () => {
+        throw new Error();
+      },
+      handlers,
+      { measureTimeout: -1 }
+    );
 
     expect(handlers.onMeasureError).toHaveBeenCalled();
   });
 
   test('triggers onProgress', async () => {
-    await runMeasureLifecycle(() => undefined, handlers, {measureTimeout: -1});
+    await runMeasureLifecycle(() => undefined, handlers, { measureTimeout: -1 });
 
     expect(handlers.onMeasureProgress).toHaveBeenCalledTimes(2);
     expect(handlers.onMeasureProgress).toHaveBeenNthCalledWith(1, 0);
@@ -105,7 +108,7 @@ describe('runMeasureLifecycle', () => {
     const beforeIterationMock = jest.fn();
     const afterIterationMock = jest.fn();
 
-    const {durationHistogram} = await runMeasureLifecycle(() => undefined, handlers, {
+    const { durationHistogram } = await runMeasureLifecycle(() => undefined, handlers, {
       measureTimeout: 100,
       warmupIterationCount: 0,
       batchIntermissionTimeout: 0,
@@ -130,16 +133,20 @@ describe('runMeasureLifecycle', () => {
     expect(onMeasureProgressMock).toHaveBeenCalledTimes(durationHistogram.size + 1);
 
     expect(onMeasureProgressMock).toHaveBeenNthCalledWith(1, 0);
-    expect(onMeasureProgressMock).toHaveBeenLastCalledWith(1)
+    expect(onMeasureProgressMock).toHaveBeenLastCalledWith(1);
   });
 
   test('captures errors in measured callback', async () => {
-    const {durationHistogram} = await runMeasureLifecycle(() => {
-      throw new Error();
-    }, handlers, {
-      measureTimeout: 10,
-      warmupIterationCount: 0,
-    });
+    const { durationHistogram } = await runMeasureLifecycle(
+      () => {
+        throw new Error();
+      },
+      handlers,
+      {
+        measureTimeout: 10,
+        warmupIterationCount: 0,
+      }
+    );
 
     expect(durationHistogram.size).toBeGreaterThan(50);
     expect(onMeasureErrorMock).toHaveBeenCalledTimes(durationHistogram.size);

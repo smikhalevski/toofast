@@ -4,7 +4,10 @@
  * @param args CLI arguments retrieved by `process.argv.slice(2)`.
  * @param aliases Map from a shorthand
  */
-export function parseCliOptions(args: string[], aliases?: Record<string, string | undefined>): Record<string, string[] | undefined> {
+export function parseCliOptions(
+  args: string[],
+  aliases?: Record<string, string | undefined>
+): Record<string, string[] | undefined> {
   const res: Record<string, string[] | undefined> = {};
 
   let optionKey: string | undefined = '';
@@ -27,7 +30,6 @@ export function parseCliOptions(args: string[], aliases?: Record<string, string 
 
     // -abc is the same as -a -b -c
     if (arg.length !== 1 && arg.charAt(0) === '-') {
-
       // No aliases, no key
       if (!aliases) {
         optionKey = undefined;

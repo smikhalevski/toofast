@@ -1,13 +1,13 @@
-import {Adder} from './Adder';
+import { Adder } from './Adder';
 
 /**
  * Provides access to mutable population statistics.
  */
 export class Histogram {
-
   /**
    * T-Distribution two-tailed critical values for 95% confidence.
    */
+  // prettier-ignore
   static tTable = [
     12.706, 4.303, 3.182, 2.776, 2.571, 2.447,
     2.365, 2.306, 2.262, 2.228, 2.201, 2.179,
@@ -17,19 +17,18 @@ export class Histogram {
     1.960,
   ];
 
-  private _adder = new Adder();
-  private _sqAdder = new Adder();
-
   /**
    * The total number of added measurements.
    */
   public size = 0;
+  private _adder = new Adder();
+  private _sqAdder = new Adder();
 
   /**
    * The mean value.
    */
   public getMean(): number {
-    const {size, _adder} = this;
+    const { size, _adder } = this;
     return size === 0 ? 0 : _adder.getSum() / size;
   }
 
@@ -40,7 +39,7 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
    */
   public getVariance(): number {
-    const {size, _sqAdder, _adder} = this;
+    const { size, _sqAdder, _adder } = this;
     const sum = _adder.getSum();
     return size === 0 ? 0 : (_sqAdder.getSum() - (sum * sum) / size) / size;
   }
@@ -60,7 +59,7 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error on Wikipedia}
    */
   public getSem(): number {
-    const {size} = this;
+    const { size } = this;
     return size === 0 ? 0 : this.getSd() / Math.sqrt(size);
   }
 
@@ -68,8 +67,8 @@ export class Histogram {
    * The margin of error.
    */
   public getMoe(): number {
-    const {tTable} = Histogram;
-    const {size} = this;
+    const { tTable } = Histogram;
+    const { size } = this;
     return size === 0 ? 0 : this.getSem() * tTable[Math.min(size, tTable.length) - 1];
   }
 

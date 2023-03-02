@@ -1,9 +1,8 @@
-import {Histogram} from './Histogram';
-import {MeasureLifecycleHandlers, RunMeasureLifecycle} from './runMeasureLifecycle';
-import {Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test} from './test-types';
+import { Histogram } from './Histogram';
+import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle';
+import { Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test } from './test-types';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
-
   /**
    * Triggered before `test` block is run.
    */
@@ -19,7 +18,6 @@ export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
 }
 
 export interface TestLifecycle {
-
   /**
    * Functions that should be exposed in a test script.
    */
@@ -40,17 +38,17 @@ export interface TestLifecycle {
  * @param runMeasureLifecycle Measures callback performance.
  * @param handlers Callbacks that are invoked at different lifecycle stages.
  *
- * @see {@link runMeasureLifecycle}
+ * @see {@linkcode runMeasureLifecycle}
  */
-export function createTestLifecycle(testPath: readonly number[], runMeasureLifecycle: RunMeasureLifecycle, handlers: TestLifecycleHandlers = {}): TestLifecycle {
-
-  const {
-    onTestStart,
-    onTestEnd,
-  } = handlers;
+export function createTestLifecycle(
+  testPath: readonly number[],
+  runMeasureLifecycle: RunMeasureLifecycle,
+  handlers: TestLifecycleHandlers = {}
+): TestLifecycle {
+  const { onTestStart, onTestEnd } = handlers;
 
   let runLifecycle: () => void;
-  let lifecyclePromise = new Promise<void>((resolve) => {
+  let lifecyclePromise = new Promise<void>(resolve => {
     runLifecycle = resolve;
   });
 
@@ -101,11 +99,11 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
     });
 
     lifecyclePromise = lifecyclePromise.then(() => {
-
       // Measure invocations must be sequential
       let measureLifecyclePromise = Promise.resolve();
 
-      const measure: Measure = (cb, options) => measureLifecyclePromise = measureLifecyclePromise
+      const measure: Measure = (cb, options) =>
+        (measureLifecyclePromise = measureLifecyclePromise
           .then(() => {
             options = Object.assign({}, measureOptions, options);
 
@@ -117,20 +115,20 @@ export function createTestLifecycle(testPath: readonly number[], runMeasureLifec
 
             return runMeasureLifecycle(cb, handlers, options);
           })
-          .then((result) => {
+          .then(result => {
             testDurationHistogram.addFromHistogram(result.durationHistogram);
             testMemoryHistogram.addFromHistogram(result.memoryHistogram);
-          });
+          }));
 
       // Always wait for measure calls to resolve
       return Promise.resolve(cb(measure)).then(() => measureLifecyclePromise);
     });
 
     lifecyclePromise = lifecyclePromise
-        .then(() => callHooks(afterEachHooks))
-        .then(() => {
-          onTestEnd?.(testDurationHistogram, testMemoryHistogram);
-        });
+      .then(() => callHooks(afterEachHooks))
+      .then(() => {
+        onTestEnd?.(testDurationHistogram, testMemoryHistogram);
+      });
   };
 
   const runtime: Runtime = {
