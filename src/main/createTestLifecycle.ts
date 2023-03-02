@@ -1,6 +1,6 @@
 import { Histogram } from './Histogram';
 import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle';
-import { Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test } from './test-types';
+import { Describe, Hook, Measure, MeasureOptions, Runtime, SyncHook, Test, TestCallback } from './test-types';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
@@ -67,7 +67,7 @@ export function createTestLifecycle(
 
   const measureOptions: MeasureOptions = {};
 
-  const describe: Describe = (label, cb, options) => {
+  const describe: Describe = function () {
     if (testPending || i >= testPath.length - 1 || j !== testPath[i]) {
       j++;
       return;
@@ -75,18 +75,18 @@ export function createTestLifecycle(
     i++;
     j = 0;
 
-    Object.assign(measureOptions, options);
-    cb();
+    arguments[typeof arguments[1] === 'function' ? 1 : (Object.assign(measureOptions, arguments[1]), 2)]();
   };
 
-  const test: Test = (label, cb, options) => {
+  const test: Test = function () {
     if (testPending || i !== testPath.length - 1 || j !== testPath[i]) {
       j++;
       return;
     }
     i++;
 
-    Object.assign(measureOptions, options);
+    const cb: TestCallback =
+      arguments[typeof arguments[1] === 'function' ? 1 : (Object.assign(measureOptions, arguments[1]), 2)];
 
     // Histogram that reflects population across all performance measurements
     const testDurationHistogram = new Histogram();
@@ -102,8 +102,12 @@ export function createTestLifecycle(
       // Measure invocations must be sequential
       let measureLifecyclePromise = Promise.resolve();
 
-      const measure: Measure = (cb, options) =>
-        (measureLifecyclePromise = measureLifecyclePromise
+      const measure: Measure = function () {
+        let options: MeasureOptions | undefined;
+
+        const cb: () => void = arguments[typeof arguments[0] === 'function' ? 0 : ((options = arguments[0]), 1)];
+
+        return (measureLifecyclePromise = measureLifecyclePromise
           .then(() => {
             options = Object.assign({}, measureOptions, options);
 
@@ -119,6 +123,7 @@ export function createTestLifecycle(
             testDurationHistogram.addFromHistogram(result.durationHistogram);
             testMemoryHistogram.addFromHistogram(result.memoryHistogram);
           }));
+      };
 
       // Always wait for measure calls to resolve
       return Promise.resolve(cb(measure)).then(() => measureLifecyclePromise);

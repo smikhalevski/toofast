@@ -70,7 +70,7 @@ export function createTestSuiteLifecycle(
     beforeIteration: noop,
     afterIteration: noop,
 
-    describe(label, cb) {
+    describe(label) {
       const node: DescribeNode = {
         nodeType: NodeType.DESCRIBE,
         parentNode,
@@ -88,7 +88,7 @@ export function createTestSuiteLifecycle(
         });
       }
 
-      cb();
+      arguments[typeof arguments[1] === 'function' ? 1 : 2]();
 
       if (onDescribeEnd) {
         lifecyclePromise = lifecyclePromise.then(() => {

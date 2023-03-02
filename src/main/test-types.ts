@@ -6,11 +6,29 @@ export type SyncHook = () => void;
 
 export type MountSyncHook = (hook: SyncHook) => void;
 
-export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
+// export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
 
-export type Measure = (cb: () => unknown, options?: MeasureOptions) => Promise<void>;
+// export type Measure = (cb: () => unknown, options?: MeasureOptions) => Promise<void>;
 
-export type Test = (label: string, cb: (measure: Measure) => PromiseLike<void> | void, options?: TestOptions) => void;
+export interface Describe {
+  (label: string, cb: () => void): void;
+
+  (label: string, options: TestOptions, cb: () => void): void;
+}
+
+export interface Test {
+  (label: string, cb: TestCallback): void;
+
+  (label: string, options: TestOptions, cb: TestCallback): void;
+}
+
+export type TestCallback = (measure: Measure) => PromiseLike<void> | void;
+
+export interface Measure {
+  (cb: () => unknown): Promise<void>;
+
+  (options: MeasureOptions, cb: () => unknown): Promise<void>;
+}
 
 export interface TestOptions {
   /**

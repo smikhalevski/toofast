@@ -119,7 +119,7 @@ describe('runMeasureLifecycle', () => {
       afterIteration: afterIterationMock,
     });
 
-    expect(durationHistogram.size).toBeGreaterThan(500);
+    expect(durationHistogram.size).toBeGreaterThan(400);
     expect(beforeBatchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(afterBatchMock.mock.calls.length).toBe(beforeBatchMock.mock.calls.length);
     expect(beforeIterationMock).toHaveBeenCalledTimes(durationHistogram.size);

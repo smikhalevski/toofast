@@ -82,7 +82,7 @@ describe('createTestLifecycle', () => {
     r.afterIteration(afterIterationHookMock);
 
     r.test('0', measure => {
-      measure(() => undefined, { measureTimeout: -1, warmupIterationCount: 1 });
+      measure({ measureTimeout: -1, warmupIterationCount: 1 }, () => undefined);
     });
 
     await lifecycle.run();
@@ -114,7 +114,7 @@ describe('createTestLifecycle', () => {
       r.beforeIteration(beforeIterationHookMock);
       r.afterIteration(afterIterationHookMock);
 
-      measure(() => undefined, { measureTimeout: -1, warmupIterationCount: 1 });
+      measure({ measureTimeout: -1, warmupIterationCount: 1 }, () => undefined);
     });
 
     await lifecycle.run();
