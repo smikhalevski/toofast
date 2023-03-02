@@ -2,173 +2,282 @@
 
 The Node.js performance testing tool with unit-test-like API.
 
-```shell
-npm install --save-dev toofast
-```
-
-- Each test is run in a separate process.
-
-- [`performance`](https://developer.mozilla.org/en-US/docs/Web/API/Performance) is used to measure function execution
-  time. Measurements are taken on every function call.
-
-- To measure performance, a function is run multiple times in batches. After each batch a process is idle for some time
-  to allow garbage collection to kick in.
-
-- Before performance is measured a warmup run of the tested function is done. Warmup is always completed in a single
-  batch.
-
-- [`process.memoryUsage().heapUsed`](https://nodejs.org/api/process.html#processmemoryusagerss) is used to measure
-  memory allocated during test execution. Memory measurement results are displayed if more than 1 kB was allocated.
-
-[API documentation is available here.](https://smikhalevski.github.io/toofast/)
+- Each test is run in a separate process;
+- Execution time is measured using [`performance`](https://developer.mozilla.org/en-US/docs/Web/API/Performance);
+- To reduce garbage collection interference, the function under test is run multiple times in batches;
+- Function is warmed up before performance is measured;
+- Memory consumption is measured using
+  [`process.memoryUsage`](https://nodejs.org/api/process.html#processmemoryusagerss).
 
 # Usage
 
-Let's get started by writing a test for a hypothetical function that adds two numbers. First, create a `sum.js` file:
+Let's write a performance test for a function that computes a factorial.
+
+Create a file `factorial.perf.js`:
 
 ```ts
-function sum(a, b) {
-  return a + b;
+function factorial(x) {
+  return x === 0 ? 1 : x * factorial(x - 1);
 }
 
-module.exports = sum;
-```
+describe('factorial', () => {
+  
+  test('of 33', measure => {
+    measure(() => {
+      factorial(33);
+    });
+  });
 
-Then, create a file named `sum.perf.js`. This will contain our actual performance test:
-
-```ts
-const sum = require('./sum');
-
-test('add numbers', (measure) => {
-  measure(() => {
-    sum(1, 2);
+  test('of 42', measure => {
+    measure(() => {
+      factorial(42);
+    });
   });
 });
 ```
 
-To run tests:
+Call `toofast` in the same directory with this file:
 
 ```shell
-toofast
+npx toofast
 ```
 
 # CLI options
 
-##### `...files`
+```bash
+toofast [options] ...files
+```
 
-The list of file paths that contain tests. Defaults to `**/*.perf.js`.
+<dl>
+<dt><code>...files</code></dt>
+<dd>
 
-##### `-t <regex>`, `--testNamePattern <regex>`
+The list of glob patterns of files that contain tests. Default is `**/*.perf.js`.
 
-Run only tests with a name that matches the regex. This option can be specified multiple times.
+</dd>
+<dt><code>-t &lt;pattern&gt;</code>, <code>--testNamePattern &lt;pattern&gt;</code></dt>
+<dd>
 
-The regex is matched against the full name, which is a combination of the test label and all its enclosing describe
-blocks.
+The name glob pattern of `describe` and `test` blocks that should be run. If specified multiple times then blocks that
+match _any_ of the patterns are run.
+
+</dd>
+</dl>
 
 # Test API
 
-In test files, each of these callbacks is available in the global environment. You don't have to require or import
-anything to use them.
+🔎 [Programmatic API documentation is available here.](https://smikhalevski.github.io/toofast/)
 
-### `test`
+TooFast injects several global callbacks in test files that register lifecycle hooks and trigger test execution.
 
-All you need in a test file is the `test` callback which runs a test. For example, let's say there's a
-function `myFunction()` which performance must be measured. Your whole test could be:
+## `test`
+
+The minimum setup that you need in a test file is the `test` callback which runs a test. For example, let's say there's
+a function `factorial()` which performance must be measured. Your whole test could be:
 
 ```ts
-test('without arguments', (measure) => {
+test('factorial of 33', measure => {
   measure(() => {
-    myFunction();
+    factorial(33);
   });
 });
 ```
 
-`measure` callback starts performance measurement and can be invoked multiple times inside a `test` block.
+The `measure` callback starts the performance measurement. It can be invoked multiple times inside a `test` block to
+collect a data population from which an average results are derived.
 
 ```ts
-test('with various arguments', (measure) => {
+test('factorial of 33 and 42', measure => {
+  
   measure(() => {
-    myFunction(123);
+    factorial(33);
   });
+
   measure(() => {
-    myFunction('abc');
+    factorial(42);
   });
 });
 ```
 
-`measure` returns a promise that is resolved as soon as performance measurement is completed. Results collected during
-all `measure` calls are used as a data population to derive function performance statistics.
+The `measure` callback returns a promise that is resolved as soon as performance measurement is completed.
 
-You can customise the measurement process by providing options to `measure`:
+[Test lifecycle](#test-lifecycle-hooks) is initiated for each `test` block and run in a separate process.
 
-```ts
-measure(() => {
-  myFunction();
-}, {warmupIterationCount: 20});
-```
-
-Following options are available:
-
-- `measureTimeout` = 10 000<br>
-  The maximum measure duration. Doesn't include the duration of warmup iterations.
-
-- `targetRme` = 0.002<br>
-  The maximum relative margin of error that must be reached for each measurement [0, 1].
-
-- `warmupIterationCount` = 1<br>
-  The maximum number of warmup iterations that are run before each measurement.
-
-- `batchIterationCount` = Infinity<br>
-  The maximum number of iterations in a batch.
-
-- `batchTimeout` = 1 000<br>
-  The maximum duration of batched measurements.
-
-- `batchIntermissionTimeout` = 200<br>
-  The delay between batched measurements. VM is expected to run garbage collector during this delay.
-
-### `describe`
+## `describe`
 
 Creates a block that groups together several related tests.
 
 ```ts
-describe('my function', () => {
-
-  test('without arguments', (measure) => {
+describe('factorial', () => {
+  
+  test('of 42', measure => {
     measure(() => {
-      myFunction();
-    });
-  });
-
-  test('with two arguments', (measure) => {
-    measure(() => {
-      myFunction(123, 'abc');
+      factorial(42);
     });
   });
 });
 ```
 
-### `beforeEach`, `afterEach`, `afterWarmup`, `beforeBatch`, `afterBatch`, `beforeIteration`, and `afterIteration`
-
-Hooks register callbacks that are invoked at different phases of the performance test lifecycle.
+`describe` blocks can be nested:
 
 ```ts
-describe('my function', () => {
+describe('Math', () => {
+  
+  describe('factorial', () => {
+    // Tests go here
+  });
+});
+```
 
+## Test lifecycle hooks
+
+There are several global functions injected by TooFast that register hooks. Hooks are invoked at different phases of the
+performance test suite lifecycle: `beforeEach`, `afterEach`, `afterWarmup`, `beforeBatch`, `afterBatch`,
+`beforeIteration`, and `afterIteration`.
+
+The chart below demonstrates when they are called.
+
+```mermaid
+flowchart TD
+
+describe --> testLifecycle
+
+subgraph testLifecycle [Test lifecycle]
+    direction LR
+
+    subgraph warmup [Warmup]
+        direction TB
+        warmupBeforeBatch(beforeBatch) -->
+        warmupBeforeIteration(beforeIteration) -->
+        warmupMeasure[measure] -->
+        warmupAfterWarmup(afterWarmup) -->
+        warmupAfterIteration(afterIteration) -->
+        warmupAfterBatch(afterBatch)
+    end
+
+    subgraph batch [Batch]
+        direction TB
+        testBeforeBatch(beforeBatch) -->
+        testBeforeIteration(beforeIteration) -->
+        testMeasure[measure] -->
+        testAfterIteration(afterIteration) -->
+        testAfterBatch(afterBatch)
+    end
+
+    beforeEach(beforeEach) -->
+    test -->
+    warmup -->
+    batch -->
+    afterEach(afterEach)
+end
+```
+
+Hooks can be registered at root level, or inside a `describe` or `test` block. Registered hooks affect `measure` calls
+that are nested in the same enclosing block.
+
+Hooks are always registered before any measurements are started, so the code below would first register `beforeEach` and
+`beforeIteration` hooks and only after that would run `measure`.
+
+```ts
+describe('factorial', () => {
+  
   beforeEach(() => {
     // Runs before each test
   });
 
-  test('without arguments', (measure) => {
+  test('of 42', measure => {
+    measure(() => {
+      factorial(42);
+    });
 
     beforeIteration(() => {
       // Runs before each measurement iteration
     });
+  });
+});
+```
 
-    measure(() => {
-      myFunction();
+## Options
+
+You can provide [test options](https://smikhalevski.github.io/toofast/interfaces/TestOptions.html) to tweak the
+measurement
+process as the first argument to `test`, `describe` and `measure`. Options of nested blocks are merged.
+
+```ts
+describe('factorial', { batchTimeout: 500 }, () => {
+  
+  test('factorial', { targetRme: 0.2 }, measure => {
+    
+    measure({ warmupIterationCount: 5 }, () => {
+      factorial(42);
     });
   });
+});
+```
 
+<dl>
+<dt><code>measureTimeout</code></dt>
+<dd>
+
+The maximum measure duration in milliseconds. Doesn't include the duration of warmup iterations. Default is 10_000.
+
+</dd>
+<dt><code>targetRme</code></dt>
+<dd>
+
+The maximum relative margin of error that must be reached for each measurement [0, 1]. Default is 0.002.
+
+</dd>
+<dt><code>warmupIterationCount</code></dt>
+<dd>
+
+The maximum number of warmup iterations that are run before each measurement. Default is 1. Set to 0 to disable warmup.
+
+</dd>
+<dt><code>batchIterationCount</code></dt>
+<dd>
+
+The maximum number of iterations in a batch. Unlimited by default.
+
+</dd>
+<dt><code>batchTimeout</code></dt>
+<dd>
+
+The maximum duration of batched measurements in milliseconds. Default is 1_000.
+
+</dd>
+<dt><code>batchIntermissionTimeout</code></dt>
+<dd>
+
+The delay between batched measurements in milliseconds. VM is expected to run garbage collector during this delay.
+Default is 200.
+
+</dd>
+<dt><code>syncIterationCount</code></dt>
+<dd>
+
+The number of sync iterations that are run by `measure` as a single code block. By default, derived from the iteration
+duration measured during the warmup phase. If `warmupIterationCount` is set to 0 (there's no warmup) then
+`syncIterationCount` set to 1. You can set this value manually to enhance measurement accuracy if tested function
+executes very fast.
+
+</dd>
+</dl>
+
+You can also [register hooks](https://smikhalevski.github.io/toofast/interfaces/MeasureOptions.html) specific for a
+particular `measure` call.
+
+```ts
+test('factorial', measure => {
+  measure(
+    {
+      beforeBatch() {
+        gc();
+      }
+    },
+    () => {
+      factorial(42);
+    }
+  );
 });
 ```
