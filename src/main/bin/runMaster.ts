@@ -1,4 +1,5 @@
 import cluster from 'cluster';
+import globToRegexp from 'glob-to-regexp';
 import { globSync } from 'glob';
 import { createTestSuiteLifecycle, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle';
 import { TestNode } from '../node-types';
@@ -52,7 +53,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
   }
 
   const options: TestSuiteLifecycleOptions = {
-    testNamePatterns: cliOptions['testNamePattern']?.map(pattern => RegExp(pattern, 'i')),
+    testNamePatterns: cliOptions['testNamePattern']?.map(pattern => globToRegexp(pattern, { flags: 'i' })),
   };
 
   let filePromise = Promise.resolve();

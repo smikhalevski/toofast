@@ -1,17 +1,11 @@
 function factorial(x) {
-  if (x < 0) {
-    return -1;
-  } else if (x === 0) {
-    return 1;
-  } else {
-    return x * factorial(x - 1);
-  }
+  return x === 0 ? 1 : x * factorial(x - 1);
 }
 
 describe('describe 0', () => {
   test('test 0.0', measure => {
     measure(() => {
-      factorial(30);
+      factorial(42);
     });
   });
 
