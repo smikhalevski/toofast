@@ -1,14 +1,10 @@
 import cluster from 'cluster';
-import fs from 'fs';
-import glob from 'glob';
-import {createRequire} from 'module';
-import path from 'path';
-import vm from 'vm';
-import {createTestSuiteLifecycle, TestSuiteLifecycleOptions} from '../createTestSuiteLifecycle';
-import {TestNode} from '../node-types';
-import {MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage} from './bin-types';
-import {parseCliOptions} from './parseCliOptions';
-import {getTestPath, handleWorkerMessage} from './utils';
+import { globSync } from 'glob';
+import { createTestSuiteLifecycle, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle';
+import { TestNode } from '../node-types';
+import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './bin-types';
+import { parseCliOptions } from './parseCliOptions';
+import { getTestPath, handleWorkerMessage } from './utils';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
 
@@ -44,11 +40,11 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
     },
   });
 
-  const cliOptions = parseCliOptions(process.argv.slice(2), {t: 'testNamePattern'});
+  const cliOptions = parseCliOptions(process.argv.slice(2), { t: 'testNamePattern' });
 
   const filePatterns = cliOptions[''] || ['**/*.perf.js'];
 
-  const filePaths = filePatterns?.flatMap((filePattern) => glob.sync(filePattern, {absolute: true}));
+  const filePaths = filePatterns?.flatMap((filePattern) => globSync(filePattern, { absolute: true }));
 
   if (!filePaths?.length) {
     // No files to run
@@ -62,9 +58,6 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
   let filePromise = Promise.resolve();
 
   for (const filePath of filePaths) {
-
-    // Read the file contents
-    const jsCode = fs.readFileSync(filePath, 'utf-8');
 
     filePromise = filePromise.then(() => {
 
@@ -89,15 +82,9 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
 
       }), handlers, options);
 
-      const vmContext = vm.createContext(Object.assign({
-        require: createRequire(filePath),
-        __dirname: path.dirname(filePath),
-        __filename: filePath,
-      }, lifecycle.runtime));
+      Object.assign(global, lifecycle.runtime);
 
-      vm.runInContext(jsCode, vmContext, {
-        filename: filePath,
-      });
+      require(filePath);
 
       return lifecycle.run().catch((error) => handlers.onTestSuiteError(lifecycle.node, error));
     });

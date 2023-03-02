@@ -1,11 +1,7 @@
-import fs from 'fs';
-import {createRequire} from 'module';
-import path from 'path';
-import vm from 'vm';
-import {createTestLifecycle, TestLifecycleHandlers} from '../createTestLifecycle';
-import {runMeasureLifecycle} from '../runMeasureLifecycle';
-import {MasterMessage, MessageType, WorkerMessage} from './bin-types';
-import {getErrorMessage, handleMasterMessage, toStats} from './utils';
+import { createTestLifecycle, TestLifecycleHandlers } from '../createTestLifecycle';
+import { runMeasureLifecycle } from '../runMeasureLifecycle';
+import { MasterMessage, MessageType, WorkerMessage } from './bin-types';
+import { getErrorMessage, handleMasterMessage, toStats } from './utils';
 
 /**
  * Runs worker that waits for test init message and sends lifecycle messages to parent process.
@@ -74,32 +70,22 @@ export function runWorker(): void {
   process.on('message', (message: MasterMessage) => handleMasterMessage(message, {
 
     onTestLifecycleInitMessage(message) {
-      const {filePath} = message;
-
-      const jsCode = fs.readFileSync(filePath, 'utf-8');
-
       const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers);
 
-      const vmContext = vm.createContext(Object.assign({
-        require: createRequire(filePath),
-        __dirname: path.dirname(filePath),
-        __filename: filePath,
-      }, lifecycle.runtime));
+      Object.assign(global, lifecycle.runtime);
 
-      vm.runInContext(jsCode, vmContext, {
-        filename: filePath,
-      });
+      require(message.filePath);
 
       lifecycle.run()
-          .catch((error) => {
-            send({
-              type: MessageType.TEST_FATAL_ERROR,
-              message: getErrorMessage(error),
-            });
-          })
-          .then(() => {
-            process.exit(0);
+        .catch((error) => {
+          send({
+            type: MessageType.TEST_FATAL_ERROR,
+            message: getErrorMessage(error),
           });
+        })
+        .then(() => {
+          process.exit(0);
+        });
     }
   }));
 }
