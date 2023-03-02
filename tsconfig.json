@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "skipLibCheck": true,
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "noUnusedLocals": true,

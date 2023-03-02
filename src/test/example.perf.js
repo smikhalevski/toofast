@@ -1,5 +1,3 @@
-const dependencyValue = require('./foo-bar');
-
 function factorial(x) {
   if (x < 0) {
     return -1;
@@ -17,7 +15,7 @@ describe('describe 0', () => {
     });
   });
 
-  test('test 0.1 (' + dependencyValue + ')', measure => {
+  test('test 0.1', measure => {
     let str = [];
     measure(() => {
       if (str.length > 10000) {
@@ -57,7 +55,7 @@ describe('describe 0', () => {
   });
 
   test('test 0.1.2 (long warmup)', measure => {
-    measure(() => 'a' + 'b', { warmupIterationCount: 1000_000_000 });
+    measure(() => 'a' + 'b', { warmupIterationCount: 100_000_000 });
   });
 });
 
