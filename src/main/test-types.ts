@@ -72,15 +72,6 @@ export interface TestOptions {
    * @default 200
    */
   batchIntermissionTimeout?: number;
-
-  /**
-   * Usually you don't need to set this option.
-   *
-   * The number of sync iterations that are measured as a single code block. By default, derived from the iteration
-   * duration measured during the warmup phase. If there's no warmup then set to 1. You can set this value manually to
-   * enhance measurement accuracy if tested function executes very fast.
-   */
-  syncIterationCount?: number;
 }
 
 export interface MeasureOptions extends TestOptions {

@@ -244,7 +244,7 @@ The maximum measure duration in milliseconds. Doesn't include the duration of wa
 <dt><code>targetRme</code></dt>
 <dd>
 
-The maximum relative margin of error that must be reached for each measurement [0, 1]. Defaults to 0.002.
+The maximum relative margin of error that must be reached for each measurement [0, 1]. Defaults to 0.01.
 
 </dd>
 <dt><code>warmupIterationCount</code></dt>
@@ -270,15 +270,6 @@ The maximum duration of batched measurements in milliseconds. Defaults to 1_000.
 
 The delay between batched measurements in milliseconds. VM is expected to run garbage collector during this delay.
 Defaults to 200.
-
-</dd>
-<dt><code>syncIterationCount</code></dt>
-<dd>
-
-The number of sync iterations that are run by `measure` as a single code block. By default, derived from the iteration
-duration measured during the warmup phase. If `warmupIterationCount` is set to 0 (there's no warmup) then
-`syncIterationCount` set to 1. You can set this value manually to enhance measurement accuracy if tested function
-executes very fast.
 
 </dd>
 </dl>
