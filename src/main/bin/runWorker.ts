@@ -69,10 +69,15 @@ export function runWorker(): void {
   process.on('message', (message: MasterMessage) =>
     handleMasterMessage(message, {
       onTestLifecycleInitMessage(message) {
-        const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers);
+        const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers, message.testOptions);
 
+        // Register globals
         Object.assign(global, lifecycle.runtime);
 
+        // Setup
+        message.setupFilePaths?.forEach(require);
+
+        // Run test
         require(message.filePath);
 
         lifecycle

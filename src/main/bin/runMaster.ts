@@ -6,6 +6,7 @@ import { TestNode } from '../node-types';
 import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './bin-types';
 import { parseCliOptions } from './parseCliOptions';
 import { getTestPath, handleWorkerMessage } from './utils';
+import { resolveConfig } from './resolveConfig';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
   let testNode: TestNode;
@@ -41,13 +42,17 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
       },
     });
 
-  const cliOptions = parseCliOptions(process.argv.slice(2), { t: 'testNamePattern' });
+  const cliOptions = parseCliOptions(process.argv.slice(2), { t: 'testNamePattern', c: 'config' });
 
-  const filePatterns = cliOptions[''] || ['**/*.perf.js'];
+  const { cwd, config } = resolveConfig(process.cwd(), cliOptions['config']?.[0]);
 
-  const filePaths = filePatterns?.flatMap(filePattern => globSync(filePattern, { absolute: true }));
+  const setupFilePaths = config.setupFiles?.flatMap(filePattern => globSync(filePattern, { absolute: true, cwd }));
 
-  if (!filePaths?.length) {
+  const includeFilePatterns = cliOptions[''] || config.include || ['**/*.perf.js'];
+
+  const includeFilePaths = includeFilePatterns?.flatMap(filePattern => globSync(filePattern, { absolute: true, cwd }));
+
+  if (!includeFilePaths?.length) {
     // No files to run
     return;
   }
@@ -58,7 +63,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
 
   let filePromise = Promise.resolve();
 
-  for (const filePath of filePaths) {
+  for (const filePath of includeFilePaths) {
     filePromise = filePromise.then(() => {
       const lifecycle = createTestSuiteLifecycle(
         node =>
@@ -77,6 +82,8 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
               type: MessageType.TEST_LIFECYCLE_INIT,
               filePath,
               testPath: getTestPath(node),
+              setupFilePaths,
+              testOptions: config.testOptions,
             };
 
             worker.send(message);
@@ -85,8 +92,13 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
         options
       );
 
+      // Register globals
       Object.assign(global, lifecycle.runtime);
 
+      // Setup
+      setupFilePaths?.forEach(require);
+
+      // Run test suite
       require(filePath);
 
       return lifecycle.run().catch(error => handlers.onTestSuiteError(lifecycle.node, error));
