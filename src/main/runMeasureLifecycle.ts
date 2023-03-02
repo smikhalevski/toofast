@@ -88,11 +88,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
     afterIteration,
   } = options;
 
-  let { syncIterationCount = 0 } = options;
-
   let lifecyclePromise = Promise.resolve();
-
-  syncIterationCount = Math.max(syncIterationCount | 0, 0);
 
   // Warmup phase
   if (warmupIterationCount > 0) {
@@ -102,21 +98,15 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
         return beforeBatch?.();
       })
       .then(() => {
-        let iterationDuration = Infinity;
-
         for (let i = 0; i < warmupIterationCount; ++i) {
           beforeIteration?.();
-          const iterationTs = performance.now();
           try {
             cb();
           } catch (error) {
             onMeasureError?.(error);
           }
-          iterationDuration = Math.min(iterationDuration, performance.now() - iterationTs);
           afterIteration?.();
         }
-
-        syncIterationCount ||= Math.ceil(batchTimeout / 1000 / iterationDuration);
 
         return afterBatch?.();
       })
@@ -127,59 +117,59 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
       });
   }
 
-  let i = 0; // Total iteration count
+  let totalIterationCount = 0;
   let progress = 0;
 
   const measureTs = Date.now();
 
   const nextBatch = (): Promise<void> | void => {
-    syncIterationCount = Math.max(1, Math.min(syncIterationCount || 1 | 0, 1000));
-
     const batchTs = Date.now();
 
-    let j = 0; // Batch iteration count
+    let iterationCount = 0;
 
     while (true) {
+      ++iterationCount;
+      ++totalIterationCount;
+
       beforeIteration?.();
 
-      const iterationTs = performance.now();
       const memoryUsed = getMemoryUsed();
+      const iterationTs = performance.now();
 
-      for (let i = 0; i < syncIterationCount; ++i) {
-        ++j;
-        try {
-          cb();
-        } catch (error) {
-          onMeasureError?.(error);
-        }
+      try {
+        cb();
+      } catch (error) {
+        onMeasureError?.(error);
       }
 
-      durationHistogram.add((performance.now() - iterationTs) / syncIterationCount);
+      durationHistogram.add(performance.now() - iterationTs);
 
       const memoryUsedDelta = getMemoryUsed() - memoryUsed;
       if (memoryUsedDelta > 0) {
-        memoryHistogram.add(memoryUsedDelta / syncIterationCount);
+        memoryHistogram.add(memoryUsedDelta);
       }
 
       afterIteration?.();
 
-      ++i;
-
       const measureDuration = Date.now() - measureTs;
       const rme = durationHistogram.getRme();
 
-      if (measureDuration > measureTimeout || (i > 2 && targetRme >= rme)) {
+      if (measureDuration > measureTimeout || (totalIterationCount > 2 && targetRme >= rme)) {
         onMeasureProgress?.(1);
 
         // Measurements completed
         return Promise.resolve(afterBatch?.());
       }
 
-      onMeasureProgress?.(
-        (progress = Math.max(progress, measureDuration / measureTimeout || 0, i > 2 ? targetRme / rme || 0 : 0))
+      progress = Math.max(
+        progress,
+        measureDuration / measureTimeout || 0,
+        totalIterationCount > 2 ? targetRme / rme || 0 : 0
       );
 
-      if (Date.now() - batchTs > batchTimeout || j >= batchIterationCount) {
+      onMeasureProgress?.(progress);
+
+      if (Date.now() - batchTs > batchTimeout || iterationCount >= batchIterationCount) {
         // Schedule the next measurement batch
         // The pause between batches is required for garbage collection
         return Promise.resolve()
