@@ -1,12 +1,13 @@
 import cluster from 'cluster';
 import globToRegexp from 'glob-to-regexp';
-import { globSync } from 'glob';
+import { globSync } from 'fast-glob';
 import { createTestSuiteLifecycle, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle';
 import { TestNode } from '../node-types';
 import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './bin-types';
-import { parseCliOptions } from './parseCliOptions';
 import { getTestPath, handleWorkerMessage } from './utils';
 import { resolveConfig } from './resolveConfig';
+import { parseArgs } from 'argcat';
+import { cliParseArgsOptions, cliOptionsShape } from './shapes';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
   let testNode: TestNode;
@@ -42,7 +43,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
       },
     });
 
-  const cliOptions = parseCliOptions(process.argv.slice(2), { t: 'testNamePattern', c: 'config' });
+  const cliOptions = cliOptionsShape.parse(parseArgs(process.argv.slice(2), cliParseArgsOptions));
 
   const { cwd, config } = resolveConfig(process.cwd(), cliOptions['config']?.[0]);
 
@@ -58,7 +59,7 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
   }
 
   const options: TestSuiteLifecycleOptions = {
-    testNamePatterns: cliOptions['testNamePattern']?.map(pattern => globToRegexp(pattern, { flags: 'i' })),
+    testNamePatterns: cliOptions['']?.map(pattern => globToRegexp(pattern, { flags: 'i' })),
   };
 
   let filePromise = Promise.resolve();

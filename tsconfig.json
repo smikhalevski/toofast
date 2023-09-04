@@ -1,14 +1,16 @@
 {
   "compilerOptions": {
-    "skipLibCheck": true,
+    "declaration": true,
+    "importHelpers": true,
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "noUnusedLocals": true,
     "strict": true,
     "target": "ES5",
-    "module": "ES6"
+    "module": "ES6",
+    "outDir": "./gen"
   },
   "include": [
-    "./src/main/**/*"
+    "./src/**/*"
   ]
 }

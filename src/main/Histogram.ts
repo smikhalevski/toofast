@@ -5,19 +5,6 @@ import { Adder } from './Adder';
  */
 export class Histogram {
   /**
-   * T-Distribution two-tailed critical values for 95% confidence.
-   */
-  // prettier-ignore
-  static tTable = [
-    12.706, 4.303, 3.182, 2.776, 2.571, 2.447,
-    2.365, 2.306, 2.262, 2.228, 2.201, 2.179,
-    2.160, 2.145, 2.131, 2.120, 2.110, 2.101,
-    2.093, 2.086, 2.080, 2.074, 2.069, 2.064,
-    2.060, 2.056, 2.052, 2.048, 2.045, 2.042,
-    1.960,
-  ];
-
-  /**
    * The total number of added measurements.
    */
   public size = 0;
@@ -27,9 +14,9 @@ export class Histogram {
   /**
    * The mean value.
    */
-  public getMean(): number {
+  get mean(): number {
     const { size, _adder } = this;
-    return size === 0 ? 0 : _adder.getSum() / size;
+    return size === 0 ? 0 : _adder.sum / size;
   }
 
   /**
@@ -38,10 +25,10 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Variance Variance on Wikipedia}
    * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
    */
-  public getVariance(): number {
+  get variance(): number {
     const { size, _sqAdder, _adder } = this;
-    const sum = _adder.getSum();
-    return size === 0 ? 0 : (_sqAdder.getSum() - (sum * sum) / size) / size;
+    const sum = _adder.sum;
+    return size === 0 ? 0 : (_sqAdder.sum - (sum * sum) / size) / size;
   }
 
   /**
@@ -49,8 +36,8 @@ export class Histogram {
    *
    * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation on Wikipedia}
    */
-  public getSd(): number {
-    return Math.sqrt(this.getVariance());
+  get sd(): number {
+    return Math.sqrt(this.variance);
   }
 
   /**
@@ -105,8 +92,8 @@ export class Histogram {
    * @param histogram The histogram to add measurements from.
    */
   public addFromHistogram(histogram: Histogram): void {
-    this._adder.add(histogram._adder.getSum());
-    this._sqAdder.add(histogram._sqAdder.getSum());
+    this._adder.add(histogram._adder.sum);
+    this._sqAdder.add(histogram._sqAdder.sum);
     this.size += histogram.size;
   }
 }
