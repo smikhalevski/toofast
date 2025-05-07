@@ -1,6 +1,6 @@
-import { DescribeNode, NodeType, TestNode, TestSuiteNode } from './node-types';
-import { Runtime } from './test-types';
-import { noop } from './utils';
+import { DescribeNode, NodeType, TestNode, TestSuiteNode } from './node-types.js';
+import { Runtime } from './test-types.js';
+import { noop } from './utils.js';
 
 export interface TestSuiteLifecycleHandlers {
   /**

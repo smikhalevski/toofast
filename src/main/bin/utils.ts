@@ -1,5 +1,5 @@
-import { Histogram } from '../Histogram';
-import { DescribeNode, NodeType, TestNode } from '../node-types';
+import { Histogram } from '../Histogram.js';
+import { DescribeNode, NodeType, TestNode } from '../node-types.js';
 import {
   MasterMessage,
   MasterMessageHandlers,
@@ -7,7 +7,7 @@ import {
   Stats,
   WorkerMessage,
   WorkerMessageHandlers,
-} from './bin-types';
+} from './bin-types.js';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {

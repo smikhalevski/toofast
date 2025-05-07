@@ -1,6 +1,6 @@
-import { Histogram } from './Histogram';
-import { MeasureOptions } from './test-types';
-import { sleep } from './utils';
+import { Histogram } from './Histogram.js';
+import { MeasureOptions } from './test-types.js';
+import { sleep } from './utils.js';
 
 export interface RunMeasureResult {
   durationHistogram: Histogram;

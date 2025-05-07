@@ -1,4 +1,5 @@
-import { Adder } from './Adder';
+import { Adder } from './Adder.js';
+import { tTable } from './constants.js';
 
 /**
  * Provides access to mutable population statistics.
@@ -14,9 +15,9 @@ export class Histogram {
   /**
    * The mean value.
    */
-  get mean(): number {
+  getMean(): number {
     const { size, _adder } = this;
-    return size === 0 ? 0 : _adder.sum / size;
+    return size === 0 ? 0 : _adder.getSum() / size;
   }
 
   /**
@@ -25,10 +26,10 @@ export class Histogram {
    * @see {@link https://en.wikipedia.org/wiki/Variance Variance on Wikipedia}
    * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
    */
-  get variance(): number {
+  getVariance(): number {
     const { size, _sqAdder, _adder } = this;
-    const sum = _adder.sum;
-    return size === 0 ? 0 : (_sqAdder.sum - (sum * sum) / size) / size;
+    const sum = _adder.getSum();
+    return size === 0 ? 0 : (_sqAdder.getSum() - (sum * sum) / size) / size;
   }
 
   /**
@@ -36,8 +37,8 @@ export class Histogram {
    *
    * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation on Wikipedia}
    */
-  get sd(): number {
-    return Math.sqrt(this.variance);
+  getSd(): number {
+    return Math.sqrt(this.getVariance());
   }
 
   /**
@@ -54,7 +55,6 @@ export class Histogram {
    * The margin of error.
    */
   public getMoe(): number {
-    const { tTable } = Histogram;
     const { size } = this;
     return size === 0 ? 0 : this.getSem() * tTable[Math.min(size, tTable.length) - 1];
   }
@@ -92,8 +92,8 @@ export class Histogram {
    * @param histogram The histogram to add measurements from.
    */
   public addFromHistogram(histogram: Histogram): void {
-    this._adder.add(histogram._adder.sum);
-    this._sqAdder.add(histogram._sqAdder.sum);
+    this._adder.add(histogram._adder.getSum());
+    this._sqAdder.add(histogram._sqAdder.getSum());
     this.size += histogram.size;
   }
 }

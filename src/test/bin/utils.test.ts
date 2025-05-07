@@ -1,5 +1,6 @@
-import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main';
-import { getLabelLength, getTestPath } from '../../main/bin/utils';
+import { describe, test, expect } from 'vitest';
+import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main/index.js';
+import { getLabelLength, getTestPath } from '../../main/bin/utils.js';
 
 describe('getTestPath', () => {
   test('returns path of the nested test', () => {

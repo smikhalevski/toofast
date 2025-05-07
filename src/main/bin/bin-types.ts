@@ -1,5 +1,5 @@
-import { DescribeNode, TestNode, TestSuiteNode } from '../node-types';
-import { TestOptions } from '../test-types';
+import { DescribeNode, TestNode, TestSuiteNode } from '../node-types.js';
+import { TestOptions } from '../test-types.js';
 
 export interface Config {
   /**

@@ -1,8 +1,8 @@
 import { bold, dim, green, red, yellow } from 'kleur/colors';
 import rl from 'readline';
-import { NodeType } from '../node-types';
-import { MasterLifecycleHandlers } from './bin-types';
-import { getErrorMessage, getLabelLength } from './utils';
+import { NodeType } from '../node-types.js';
+import { MasterLifecycleHandlers } from './bin-types.js';
+import { getErrorMessage, getLabelLength } from './utils.js';
 
 const M_PADDING = '  ';
 const M_PENDING = dim('○ ');
@@ -50,7 +50,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       ++depth;
     },
 
-    onDescribeEnd(node) {
+    onDescribeEnd(_node) {
       --depth;
     },
 
@@ -69,7 +69,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       write(M_PADDING.repeat(depth) + M_PENDING + testLabel + M_PADDING);
     },
 
-    onTestEnd(node, durationStats, memoryStats) {
+    onTestEnd(_node, durationStats, memoryStats) {
       clearLine();
       write(
         M_PADDING.repeat(depth) +
@@ -86,34 +86,34 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       );
     },
 
-    onTestFatalError(node, error) {
+    onTestFatalError(_node, error) {
       errorMessage = getErrorMessage(error);
       clearLine();
       write(M_PADDING.repeat(depth) + M_ERROR + testLabel + '\n' + red(errorMessage));
     },
 
-    onTestSuiteError(node, error) {
+    onTestSuiteError(_node, error) {
       write('\n\n' + red(getErrorMessage(error)));
     },
 
-    onMeasureWarmupStart(node) {
+    onMeasureWarmupStart(_node) {
       clearLine();
       write(M_PADDING.repeat(depth) + M_WARMUP + testLabel + M_PADDING + formatMeasureCount(measureCount) + M_PADDING);
     },
 
-    onMeasureWarmupEnd(node) {},
+    onMeasureWarmupEnd(_node) {},
 
-    onMeasureStart(node) {},
+    onMeasureStart(_node) {},
 
-    onMeasureEnd(node, stats) {
+    onMeasureEnd(_node, _stats) {
       ++measureCount;
     },
 
-    onMeasureError(node, error) {
+    onMeasureError(_node, error) {
       errorMessage ||= getErrorMessage(error);
     },
 
-    onMeasureProgress(node, percent) {
+    onMeasureProgress(_node, percent) {
       clearLine();
       write(
         M_PADDING.repeat(depth) +

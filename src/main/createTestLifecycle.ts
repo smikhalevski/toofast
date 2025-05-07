@@ -1,5 +1,5 @@
-import { Histogram } from './Histogram';
-import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle';
+import { Histogram } from './Histogram.js';
+import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle.js';
 import {
   Describe,
   Hook,
@@ -10,7 +10,7 @@ import {
   Test,
   TestCallback,
   TestOptions,
-} from './test-types';
+} from './test-types.js';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
