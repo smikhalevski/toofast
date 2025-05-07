@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { red } from 'kleur/colors';
-import { Config } from './bin-types.js';
+import { Config } from './types.js';
 
 const configFilePaths = ['.toofastrc', 'toofast.json', 'toofast.config.js'];
 

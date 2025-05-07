@@ -1,5 +1,5 @@
-import { DescribeNode, TestNode, TestSuiteNode } from '../node-types.js';
-import { TestOptions } from '../test-types.js';
+import { TestOptions } from '../types.js';
+import { DescribeNode, TestNode, TestSuiteNode } from '../createTestSuiteLifecycle.js';
 
 export interface Config {
   /**
@@ -35,22 +35,22 @@ export interface Stats {
   /**
    * The expectation of the squared deviation of a random variable from its mean.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Variance Variance on Wikipedia}
-   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance on Wikipedia}
+   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
+   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance}
    */
   variance: number;
 
   /**
    * The standard deviation is a measure of the amount of variation or dispersion of a set of values.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation on Wikipedia}
+   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
    */
   sd: number;
 
   /**
    * The standard error of the mean.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error on Wikipedia}
+   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
    */
   sem: number;
 
@@ -62,7 +62,7 @@ export interface Stats {
   /**
    * The relative margin of error [0, 1].
    *
-   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error on Wikipedia}
+   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
    */
   rme: number;
 

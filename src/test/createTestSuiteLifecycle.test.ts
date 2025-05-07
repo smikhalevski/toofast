@@ -1,8 +1,7 @@
-import { test, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import {
   createTestSuiteLifecycle,
   DescribeNode,
-  NodeType,
   TestNode,
   TestSuiteLifecycleHandlers,
   TestSuiteNode,
@@ -45,79 +44,79 @@ test('assembles nodes', () => {
   r.test('2', () => undefined);
 
   const node: TestSuiteNode = {
-    nodeType: NodeType.TEST_SUITE,
+    type: 'testSuite',
     children: [],
   };
 
   const node0: DescribeNode = {
-    nodeType: NodeType.DESCRIBE,
-    parentNode: node,
+    type: 'describe',
+    parent: node,
     children: [],
     label: '0',
   };
   node.children.push(node0);
 
   const node00: TestNode = {
-    nodeType: NodeType.TEST,
-    parentNode: node0,
+    type: 'test',
+    parent: node0,
     label: '0.0',
-    enabled: true,
+    isEnabled: true,
   };
   node0.children.push(node00);
 
   const node1: DescribeNode = {
-    nodeType: NodeType.DESCRIBE,
-    parentNode: node,
+    type: 'describe',
+    parent: node,
     children: [],
     label: '1',
   };
   node.children.push(node1);
 
   const node10: DescribeNode = {
-    nodeType: NodeType.DESCRIBE,
-    parentNode: node1,
+    type: 'describe',
+    parent: node1,
     children: [],
     label: '1.0',
   };
   node1.children.push(node10);
 
   const node100: TestNode = {
-    nodeType: NodeType.TEST,
-    parentNode: node10,
+    type: 'test',
+    parent: node10,
     label: '1.0.0',
-    enabled: true,
+    isEnabled: true,
   };
   node10.children.push(node100);
 
   const node11: DescribeNode = {
-    nodeType: NodeType.DESCRIBE,
-    parentNode: node1,
+    type: 'describe',
+    parent: node1,
     children: [],
     label: '1.1',
   };
   node1.children.push(node11);
 
   const node110: TestNode = {
-    nodeType: NodeType.TEST,
-    parentNode: node11,
+    type: 'test',
+    parent: node11,
     label: '1.1.0',
-    enabled: true,
+    isEnabled: true,
   };
   node11.children.push(node110);
 
   const node111: TestNode = {
-    nodeType: NodeType.TEST,
-    parentNode: node11,
+    type: 'test',
+    parent: node11,
     label: '1.1.1',
-    enabled: true,
+    isEnabled: true,
   };
   node11.children.push(node111);
 
   const node2: TestNode = {
-    nodeType: NodeType.TEST,
-    parentNode: node,
+    type: 'test',
+    parent: node,
     label: '2',
-    enabled: true,
+    isEnabled: true,
   };
   node.children.push(node2);
 

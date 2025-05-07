@@ -1,3 +1,4 @@
+// #!/usr/bin/env node
 import cluster from 'cluster';
 import { createLoggingHandlers } from './createLoggingHandlers.js';
 import { runMaster } from './runMaster.js';

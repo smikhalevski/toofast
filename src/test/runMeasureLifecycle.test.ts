@@ -50,8 +50,8 @@ test('invokes afterWarmup callback', async () => {
   expect(afterWarmupMock).toHaveBeenCalledTimes(1);
 });
 
-test('respects warmupIterationCount', () =>
-  new Promise<void>(done => () => {
+test('respects warmupIterationCount', () => {
+  return new Promise<void>(done => {
     const cbMock = vi.fn();
     const beforeIterationMock = vi.fn();
     const afterIterationMock = vi.fn();
@@ -69,7 +69,8 @@ test('respects warmupIterationCount', () =>
       beforeIteration: beforeIterationMock,
       afterIteration: afterIterationMock,
     });
-  }));
+  });
+});
 
 test('does not invoke afterWarmup callback', async () => {
   const afterWarmupMock = vi.fn();

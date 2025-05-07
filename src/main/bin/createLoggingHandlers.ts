@@ -1,7 +1,6 @@
 import { bold, dim, green, red, yellow } from 'kleur/colors';
 import rl from 'readline';
-import { NodeType } from '../node-types.js';
-import { MasterLifecycleHandlers } from './bin-types.js';
+import { MasterLifecycleHandlers } from './types.js';
 import { getErrorMessage, getLabelLength } from './utils.js';
 
 const M_PADDING = '  ';
@@ -43,7 +42,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
 
   return {
     onDescribeStart(node) {
-      if (node.parentNode.nodeType !== NodeType.TEST_SUITE || node.parentNode.children[0] !== node) {
+      if (node.parent.type !== 'testSuite' || node.parent.children[0] !== node) {
         write('\n');
       }
       write(M_PADDING.repeat(depth) + bold(node.label) + '\n');
@@ -57,7 +56,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     onTestStart(node) {
       if (errorMessage != null) {
         write('\n\n');
-      } else if (node.parentNode.children[node.parentNode.children.indexOf(node) - 1]?.nodeType === NodeType.DESCRIBE) {
+      } else if (node.parent.children[node.parent.children.indexOf(node) - 1]?.type === 'describe') {
         write('\n');
       }
 

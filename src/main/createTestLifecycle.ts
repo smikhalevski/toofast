@@ -10,7 +10,7 @@ import {
   Test,
   TestCallback,
   TestOptions,
-} from './test-types.js';
+} from './types.js';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
@@ -21,15 +21,15 @@ export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
    * Triggered when the `test` block is completed. Not invoked if an error occurred in test lifecycle.
    *
-   * @param durationHistogram Tested callback performance statistics across all measurements.
-   * @param memoryHistogram
+   * @param durationHistogram Duration statistics across all measurements.
+   * @param memoryHistogram Memory statistics across all measurements.
    */
   onTestEnd?(durationHistogram: Histogram, memoryHistogram: Histogram): void;
 }
 
 export interface TestLifecycle {
   /**
-   * Functions that should be exposed in a test script.
+   * Functions that should be exposed as global in a test script.
    */
   runtime: Runtime;
 
@@ -49,7 +49,7 @@ export interface TestLifecycle {
  * @param handlers Callbacks that are invoked at different lifecycle stages.
  * @param measureOptions The default measure options.
  *
- * @see {@linkcode runMeasureLifecycle}
+ * @see {@link runMeasureLifecycle}
  */
 export function createTestLifecycle(
   testPath: readonly number[],
@@ -75,12 +75,12 @@ export function createTestLifecycle(
   let beforeIterationHooks: SyncHook[] | undefined;
   let afterIterationHooks: SyncHook[] | undefined;
 
-  let testPending = false;
+  let isTestPending = false;
 
   measureOptions = Object.assign({}, measureOptions);
 
   const describe: Describe = function () {
-    if (testPending || i >= testPath.length - 1 || j !== testPath[i]) {
+    if (isTestPending || i >= testPath.length - 1 || j !== testPath[i]) {
       j++;
       return;
     }
@@ -91,7 +91,7 @@ export function createTestLifecycle(
   };
 
   const test: Test = function () {
-    if (testPending || i !== testPath.length - 1 || j !== testPath[i]) {
+    if (isTestPending || i !== testPath.length - 1 || j !== testPath[i]) {
       j++;
       return;
     }
@@ -100,12 +100,12 @@ export function createTestLifecycle(
     const cb: TestCallback =
       arguments[typeof arguments[1] === 'function' ? 1 : (Object.assign(measureOptions, arguments[1]), 2)];
 
-    // Histogram that reflects population across all performance measurements
+    // Histograms that reflect population across all measurements
     const testDurationHistogram = new Histogram();
     const testMemoryHistogram = new Histogram();
 
     lifecyclePromise = lifecyclePromise.then(() => {
-      testPending = true;
+      isTestPending = true;
       onTestStart?.();
       return callHooks(beforeEachHooks);
     });
@@ -132,8 +132,8 @@ export function createTestLifecycle(
             return runMeasureLifecycle(cb, handlers, options);
           })
           .then(result => {
-            testDurationHistogram.addFromHistogram(result.durationHistogram);
-            testMemoryHistogram.addFromHistogram(result.memoryHistogram);
+            testDurationHistogram.add(result.durationHistogram);
+            testMemoryHistogram.add(result.memoryHistogram);
           }));
       };
 
@@ -184,31 +184,33 @@ export function createTestLifecycle(
 }
 
 function callHooks(hooks: Hook[] | undefined): Promise<void> | undefined {
-  if (hooks) {
-    let promise = Promise.resolve();
-
-    for (const hook of hooks) {
-      promise = promise.then(hook);
-    }
-    return promise;
+  if (hooks === undefined) {
+    return;
   }
+
+  let promise = Promise.resolve();
+
+  for (const hook of hooks) {
+    promise = promise.then(hook);
+  }
+  return promise;
 }
 
 function combineHooks(hooks: Hook[] | undefined, hook: Hook | undefined): Hook | undefined {
-  if (hooks || hook) {
-    return () => Promise.resolve(callHooks(hooks)).then(hook);
+  if (hooks === undefined && hook === undefined) {
+    return;
   }
+  return () => Promise.resolve(callHooks(hooks)).then(hook);
 }
 
 function combineSyncHooks(hooks: SyncHook[] | undefined, hook: SyncHook | undefined): SyncHook | undefined {
-  if (hooks || hook) {
-    return () => {
-      if (hooks) {
-        for (const hook of hooks) {
-          hook();
-        }
-      }
-      hook?.();
-    };
+  if (hooks === undefined) {
+    return hook;
   }
+  return () => {
+    for (const hook of hooks) {
+      hook();
+    }
+    hook?.();
+  };
 }

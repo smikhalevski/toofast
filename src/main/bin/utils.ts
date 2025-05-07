@@ -1,5 +1,4 @@
 import { Histogram } from '../Histogram.js';
-import { DescribeNode, NodeType, TestNode } from '../node-types.js';
 import {
   MasterMessage,
   MasterMessageHandlers,
@@ -7,7 +6,8 @@ import {
   Stats,
   WorkerMessage,
   WorkerMessageHandlers,
-} from './bin-types.js';
+} from './types.js';
+import { DescribeNode, TestNode } from '../createTestSuiteLifecycle.js';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {
@@ -60,13 +60,13 @@ export function handleMasterMessage(message: MasterMessage, handlers: MasterMess
 export function toStats(histogram: Histogram): Stats {
   return {
     size: histogram.size,
-    mean: histogram.getMean(),
-    variance: histogram.getVariance(),
-    sd: histogram.getSd(),
-    sem: histogram.getSem(),
-    moe: histogram.getMoe(),
-    rme: histogram.getRme(),
-    hz: histogram.getHz(),
+    mean: histogram.mean,
+    variance: histogram.variance,
+    sd: histogram.sd,
+    sem: histogram.sem,
+    moe: histogram.moe,
+    rme: histogram.rme,
+    hz: histogram.hz,
   };
 }
 
@@ -77,31 +77,31 @@ export function getErrorMessage(error: any): string {
 export function getTestPath(node: DescribeNode | TestNode): number[] {
   const testPath: number[] = [];
 
-  let parentNode = node.parentNode;
+  let parent = node.parent;
 
   while (true) {
-    testPath.unshift(parentNode.children.indexOf(node));
-    if (parentNode.nodeType === NodeType.TEST_SUITE) {
+    testPath.unshift(parent.children.indexOf(node));
+    if (parent.type === 'testSuite') {
       break;
     }
-    node = parentNode;
-    parentNode = parentNode.parentNode;
+    node = parent;
+    parent = parent.parent;
   }
   return testPath;
 }
 
 export function getLabelLength(node: TestNode): number {
-  const siblings = node.parentNode.children;
+  const siblings = node.parent.children;
 
   let i = siblings.indexOf(node);
 
-  while (i !== 0 && siblings[i - 1].nodeType === NodeType.TEST) {
+  while (i !== 0 && siblings[i - 1].type === 'test') {
     --i;
   }
 
   let length = 0;
 
-  while (i < siblings.length && siblings[i].nodeType === NodeType.TEST) {
+  while (i < siblings.length && siblings[i].type === 'test') {
     length = Math.max(length, siblings[i].label.length);
     ++i;
   }

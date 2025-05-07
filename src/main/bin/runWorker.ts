@@ -1,6 +1,6 @@
 import { createTestLifecycle, TestLifecycleHandlers } from '../createTestLifecycle.js';
 import { runMeasureLifecycle } from '../runMeasureLifecycle.js';
-import { MasterMessage, MessageType, WorkerMessage } from './bin-types.js';
+import { MasterMessage, MessageType, WorkerMessage } from './types.js';
 import { getErrorMessage, handleMasterMessage, toStats } from './utils.js';
 
 /**

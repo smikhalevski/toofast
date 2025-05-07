@@ -6,10 +6,6 @@ export type SyncHook = () => void;
 
 export type MountSyncHook = (hook: SyncHook) => void;
 
-// export type Describe = (label: string, cb: () => void, options?: TestOptions) => void;
-
-// export type Measure = (cb: () => unknown, options?: MeasureOptions) => Promise<void>;
-
 export interface Describe {
   (label: string, cb: () => void): void;
 

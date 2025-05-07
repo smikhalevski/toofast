@@ -1,13 +1,12 @@
 import cluster from 'cluster';
 import globToRegexp from 'glob-to-regexp';
 import { globSync } from 'fast-glob';
-import { createTestSuiteLifecycle, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle.js';
-import { TestNode } from '../node-types.js';
-import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './bin-types.js';
+import { createTestSuiteLifecycle, TestNode, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle.js';
+import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './types.js';
 import { getTestPath, handleWorkerMessage } from './utils.js';
 import { resolveConfig } from './resolveConfig.js';
 import { parseArgs } from 'argcat';
-import { cliParseArgsOptions, cliOptionsShape } from './shapes.js';
+import { cliOptionsShape, cliParseArgsOptions } from './shapes.js';
 
 export function runMaster(handlers: MasterLifecycleHandlers): void {
   let testNode: TestNode;

@@ -1,6 +1,24 @@
-import { DescribeNode, NodeType, TestNode, TestSuiteNode } from './node-types.js';
-import { Runtime } from './test-types.js';
+import { Runtime } from './types.js';
 import { noop } from './utils.js';
+
+export interface TestSuiteNode {
+  type: 'testSuite';
+  children: Array<DescribeNode | TestNode>;
+}
+
+export interface DescribeNode {
+  type: 'describe';
+  parent: TestSuiteNode | DescribeNode;
+  label: string;
+  children: Array<DescribeNode | TestNode>;
+}
+
+export interface TestNode {
+  type: 'test';
+  parent: TestSuiteNode | DescribeNode;
+  label: string;
+  isEnabled: boolean;
+}
 
 export interface TestSuiteLifecycleHandlers {
   /**
@@ -55,11 +73,11 @@ export function createTestSuiteLifecycle(
   });
 
   const node: TestSuiteNode = {
-    nodeType: NodeType.TEST_SUITE,
+    type: 'testSuite',
     children: [],
   };
 
-  let parentNode: DescribeNode | TestSuiteNode = node;
+  let parent: DescribeNode | TestSuiteNode = node;
 
   const runtime: Runtime = {
     beforeEach: noop,
@@ -72,13 +90,14 @@ export function createTestSuiteLifecycle(
 
     describe(label) {
       const node: DescribeNode = {
-        nodeType: NodeType.DESCRIBE,
-        parentNode,
+        type: 'describe',
+        parent,
         label,
         children: [],
       };
-      parentNode.children.push(node);
-      parentNode = node;
+
+      parent.children.push(node);
+      parent = node;
 
       if (onDescribeStart) {
         lifecyclePromise = lifecyclePromise.then(() => {
@@ -98,24 +117,25 @@ export function createTestSuiteLifecycle(
         });
       }
 
-      parentNode = node.parentNode;
+      parent = node.parent;
     },
 
     test(label) {
       const node: TestNode = {
-        nodeType: NodeType.TEST,
-        parentNode,
+        type: 'test',
+        parent,
         label,
-        enabled: true,
+        isEnabled: true,
       };
-      parentNode.children.push(node);
+
+      parent.children.push(node);
 
       if (testNamePatterns) {
-        node.enabled = testNamePatterns.some(re => isMatchingLabel(node, re));
+        node.isEnabled = testNamePatterns.some(pattern => isMatchingLabel(node, pattern));
       }
 
       lifecyclePromise = lifecyclePromise.then(() => {
-        if (node.enabled) {
+        if (node.isEnabled) {
           return runTestLifecycle(node);
         }
       });
@@ -132,18 +152,13 @@ export function createTestSuiteLifecycle(
   };
 }
 
-function isMatchingLabel(node: DescribeNode | TestNode, re: RegExp): boolean {
-  return (
-    re.test(node.label) || (node.parentNode.nodeType !== NodeType.TEST_SUITE && isMatchingLabel(node.parentNode, re))
-  );
+function isMatchingLabel(node: DescribeNode | TestNode, pattern: RegExp): boolean {
+  return pattern.test(node.label) || (node.parent.type !== 'testSuite' && isMatchingLabel(node.parent, pattern));
 }
 
 function hasEnabledTests(node: DescribeNode): boolean {
   for (const child of node.children) {
-    if (
-      (child.nodeType === NodeType.DESCRIBE && hasEnabledTests(child)) ||
-      (child.nodeType === NodeType.TEST && child.enabled)
-    ) {
+    if ((child.type === 'describe' && hasEnabledTests(child)) || (child.type === 'test' && child.isEnabled)) {
       return true;
     }
   }

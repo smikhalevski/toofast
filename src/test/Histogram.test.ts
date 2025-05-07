@@ -5,13 +5,13 @@ test('creates a blank histogram', () => {
   const histogram = new Histogram();
 
   expect(histogram.size).toBe(0);
-  expect(histogram.getMean()).toBe(0);
-  expect(histogram.getVariance()).toBe(0);
-  expect(histogram.getSd()).toBe(0);
-  expect(histogram.getSem()).toBe(0);
-  expect(histogram.getMoe()).toBe(0);
-  expect(histogram.getRme()).toBe(0);
-  expect(histogram.getHz()).toBe(0);
+  expect(histogram.mean).toBe(0);
+  expect(histogram.variance).toBe(0);
+  expect(histogram.sd).toBe(0);
+  expect(histogram.sem).toBe(0);
+  expect(histogram.moe).toBe(0);
+  expect(histogram.rme).toBe(0);
+  expect(histogram.hz).toBe(0);
 });
 
 test('calculates stats for a single item', () => {
@@ -20,13 +20,13 @@ test('calculates stats for a single item', () => {
   histogram.add(1);
 
   expect(histogram.size).toBe(1);
-  expect(histogram.getMean()).toBe(1);
-  expect(histogram.getVariance()).toBe(0);
-  expect(histogram.getSd()).toBe(0);
-  expect(histogram.getSem()).toBe(0);
-  expect(histogram.getMoe()).toBe(0);
-  expect(histogram.getRme()).toBe(0);
-  expect(histogram.getHz()).toBe(1000);
+  expect(histogram.mean).toBe(1);
+  expect(histogram.variance).toBe(0);
+  expect(histogram.sd).toBe(0);
+  expect(histogram.sem).toBe(0);
+  expect(histogram.moe).toBe(0);
+  expect(histogram.rme).toBe(0);
+  expect(histogram.hz).toBe(1000);
 });
 
 test('calculates stats for multiple items', () => {
@@ -37,11 +37,11 @@ test('calculates stats for multiple items', () => {
   histogram.add(3);
 
   expect(histogram.size).toBe(3);
-  expect(histogram.getMean()).toBe(2);
-  expect(histogram.getVariance()).toBeCloseTo(0.6666);
-  expect(histogram.getSd()).toBeCloseTo(0.8164);
-  expect(histogram.getSem()).toBeCloseTo(0.4714);
-  expect(histogram.getMoe()).toBeCloseTo(1.5);
-  expect(histogram.getRme()).toBeCloseTo(0.75);
-  expect(histogram.getHz()).toBe(500);
+  expect(histogram.mean).toBe(2);
+  expect(histogram.variance).toBeCloseTo(0.6666);
+  expect(histogram.sd).toBeCloseTo(0.8164);
+  expect(histogram.sem).toBeCloseTo(0.4714);
+  expect(histogram.moe).toBeCloseTo(1.5);
+  expect(histogram.rme).toBeCloseTo(0.75);
+  expect(histogram.hz).toBe(500);
 });
