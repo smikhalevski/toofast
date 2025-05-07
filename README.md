@@ -1,4 +1,10 @@
-# TooFast ⚡️ [![build](https://github.com/smikhalevski/toofast/actions/workflows/test.yml/badge.svg?branch=master&event=push)](https://github.com/smikhalevski/toofast/actions/workflows/test.yml)
+<p align="center">
+  <a href="#readme"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="./assets/logo-light.png" />
+    <img alt="Doubter" src="./assets/logo-light.png" width="600" />
+  </picture></a>
+</p>
 
 The Node.js performance testing tool with unit-test-like API.
 
