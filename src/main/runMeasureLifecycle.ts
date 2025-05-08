@@ -2,13 +2,12 @@ import { Histogram } from './Histogram.js';
 import { MeasureOptions } from './types.js';
 import { sleep } from './utils.js';
 
-// Defaults
-const MEASURE_TIMEOUT = 10_000;
-const TARGET_RME = 0.01;
-const WARMUP_ITERATION_COUNT = 1;
-const BATCH_ITERATION_COUNT = Infinity;
-const BATCH_TIMEOUT = 1_000;
-const BATCH_INTERMISSION_TIMEOUT = 200;
+const DEFAULT_MEASURE_TIMEOUT = 10_000;
+const DEFAULT_TARGET_RME = 0.01;
+const DEFAULT_WARMUP_ITERATION_COUNT = 1;
+const DEFAULT_BATCH_ITERATION_COUNT = Infinity;
+const DEFAULT_BATCH_TIMEOUT = 1_000;
+const DEFAULT_BATCH_INTERMISSION_TIMEOUT = 200;
 
 export interface RunMeasureResult {
   durationHistogram: Histogram;
@@ -82,12 +81,12 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
     handlers;
 
   const {
-    measureTimeout = MEASURE_TIMEOUT,
-    targetRme = TARGET_RME,
-    warmupIterationCount = WARMUP_ITERATION_COUNT,
-    batchIterationCount = BATCH_ITERATION_COUNT,
-    batchTimeout = BATCH_TIMEOUT,
-    batchIntermissionTimeout = BATCH_INTERMISSION_TIMEOUT,
+    measureTimeout = DEFAULT_MEASURE_TIMEOUT,
+    targetRme = DEFAULT_TARGET_RME,
+    warmupIterationCount = DEFAULT_WARMUP_ITERATION_COUNT,
+    batchIterationCount = DEFAULT_BATCH_ITERATION_COUNT,
+    batchTimeout = DEFAULT_BATCH_TIMEOUT,
+    batchIntermissionTimeout = DEFAULT_BATCH_INTERMISSION_TIMEOUT,
     afterWarmup,
     beforeBatch,
     afterBatch,
