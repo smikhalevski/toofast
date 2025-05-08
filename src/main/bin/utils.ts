@@ -1,49 +1,41 @@
-import { Histogram } from '../Histogram.js';
-import {
-  MasterMessage,
-  MasterMessageHandlers,
-  MessageType,
-  Stats,
-  WorkerMessage,
-  WorkerMessageHandlers,
-} from './types.js';
+import { MasterMessage, MasterMessageHandlers, WorkerMessage, WorkerMessageHandlers } from './types.js';
 import { DescribeNode, TestNode } from '../createTestSuiteLifecycle.js';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {
-    case MessageType.TEST_START:
+    case 'testStart':
       handlers.onTestStartMessage(message);
       return true;
 
-    case MessageType.TEST_END:
+    case 'testEnd':
       handlers.onTestEndMessage(message);
       return true;
 
-    case MessageType.TEST_FATAL_ERROR:
+    case 'testFatalError':
       handlers.onTestFatalErrorMessage(message);
       return true;
 
-    case MessageType.MEASURE_WARMUP_START:
+    case 'measureWarmupStart':
       handlers.onMeasureWarmupStartMessage(message);
       return true;
 
-    case MessageType.MEASURE_WARMUP_END:
+    case 'measureWarmupEnd':
       handlers.onMeasureWarmupEndMessage(message);
       return true;
 
-    case MessageType.MEASURE_START:
+    case 'measureStart':
       handlers.onMeasureStartMessage(message);
       return true;
 
-    case MessageType.MEASURE_END:
+    case 'measureEnd':
       handlers.onMeasureEndMessage(message);
       return true;
 
-    case MessageType.MEASURE_ERROR:
+    case 'measureError':
       handlers.onMeasureErrorMessage(message);
       return true;
 
-    case MessageType.MEASURE_PROGRESS:
+    case 'measureProgress':
       handlers.onMeasureProgressMessage(message);
       return true;
   }
@@ -51,23 +43,10 @@ export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMess
 
 export function handleMasterMessage(message: MasterMessage, handlers: MasterMessageHandlers): true {
   switch (message.type) {
-    case MessageType.TEST_LIFECYCLE_INIT:
+    case 'testLifecycleInit':
       handlers.onTestLifecycleInitMessage(message);
       return true;
   }
-}
-
-export function toStats(histogram: Histogram): Stats {
-  return {
-    size: histogram.size,
-    mean: histogram.mean,
-    variance: histogram.variance,
-    sd: histogram.sd,
-    sem: histogram.sem,
-    moe: histogram.moe,
-    rme: histogram.rme,
-    hz: histogram.hz,
-  };
 }
 
 export function getErrorMessage(error: any): string {
@@ -90,7 +69,7 @@ export function getTestPath(node: DescribeNode | TestNode): number[] {
   return testPath;
 }
 
-export function getLabelLength(node: TestNode): number {
+export function getNameLength(node: TestNode): number {
   const siblings = node.parent.children;
 
   let i = siblings.indexOf(node);
@@ -102,9 +81,13 @@ export function getLabelLength(node: TestNode): number {
   let length = 0;
 
   while (i < siblings.length && siblings[i].type === 'test') {
-    length = Math.max(length, siblings[i].label.length);
+    length = Math.max(length, siblings[i].name.length);
     ++i;
   }
 
   return length;
+}
+
+export function loadFile(filePath: string): Promise<any> {
+  return new Promise(resolve => resolve(require(filePath)));
 }

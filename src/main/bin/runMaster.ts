@@ -1,17 +1,46 @@
-import cluster from 'cluster';
-import globToRegexp from 'glob-to-regexp';
-import { globSync } from 'fast-glob';
-import { createTestSuiteLifecycle, TestNode, TestSuiteLifecycleOptions } from '../createTestSuiteLifecycle.js';
-import { MasterLifecycleHandlers, MessageType, TestLifecycleInitMessage, WorkerMessage } from './types.js';
+import { createTestSuiteLifecycle, TestNode } from '../createTestSuiteLifecycle.js';
+import { MasterLifecycleHandlers, MasterMessage, WorkerMessage } from './types.js';
 import { getTestPath, handleWorkerMessage } from './utils.js';
-import { resolveConfig } from './resolveConfig.js';
-import { parseArgs } from 'argcat';
-import { cliOptionsShape, cliParseArgsOptions } from './shapes.js';
+import { Runtime, TestOptions } from '../types.js';
 
-export function runMaster(handlers: MasterLifecycleHandlers): void {
+export interface WorkerOptions {
+  onMessage(message: any): void;
+  onError(error: any): void;
+  onExit(): void;
+}
+
+export interface Worker {
+  postMessage(message: MasterMessage): void;
+}
+
+export interface RunMasterOptions {
+  setupFilePaths: string[] | undefined;
+  includeFilePaths: string[];
+  testNamePatterns: RegExp[] | undefined;
+  testOptions: TestOptions | undefined;
+  handlers: MasterLifecycleHandlers;
+  loadFile: (filePath: string) => Promise<void> | void;
+  loadRuntime: (runtime: Runtime) => Promise<void> | void;
+  startWorker: (options: WorkerOptions) => Worker;
+  tearDown: () => void;
+}
+
+export function runMaster(options: RunMasterOptions): void {
+  const {
+    setupFilePaths,
+    includeFilePaths,
+    testNamePatterns,
+    testOptions,
+    handlers,
+    loadFile,
+    loadRuntime,
+    startWorker,
+    tearDown,
+  } = options;
+
   let testNode: TestNode;
 
-  const handleMessage = (message: WorkerMessage) =>
+  const handleMessage = (message: WorkerMessage) => {
     handleWorkerMessage(message, {
       onTestStartMessage() {
         handlers.onTestStart(testNode);
@@ -35,78 +64,56 @@ export function runMaster(handlers: MasterLifecycleHandlers): void {
         handlers.onMeasureEnd(testNode, message.stats);
       },
       onMeasureErrorMessage(message) {
-        handlers.onMeasureError(testNode, message.message);
+        handlers.onMeasureError(testNode, message.errorMessage);
       },
       onMeasureProgressMessage(message) {
         handlers.onMeasureProgress(testNode, message.percent);
       },
     });
-
-  const cliOptions = cliOptionsShape.parse(parseArgs(process.argv.slice(2), cliParseArgsOptions));
-
-  const { cwd, config } = resolveConfig(process.cwd(), cliOptions['config']?.[0]);
-
-  const setupFilePaths = config.setupFiles?.flatMap(filePattern => globSync(filePattern, { absolute: true, cwd }));
-
-  const includeFilePatterns = cliOptions[''] || config.include || ['**/*.perf.js'];
-
-  const includeFilePaths = includeFilePatterns?.flatMap(filePattern => globSync(filePattern, { absolute: true, cwd }));
-
-  if (!includeFilePaths?.length) {
-    // No files to run
-    return;
-  }
-
-  const options: TestSuiteLifecycleOptions = {
-    testNamePatterns: cliOptions['']?.map(pattern => globToRegexp(pattern, { flags: 'i' })),
   };
 
-  let filePromise = Promise.resolve();
+  let testSuitePromise = Promise.resolve();
 
-  for (const filePath of includeFilePaths) {
-    filePromise = filePromise.then(() => {
-      const lifecycle = createTestSuiteLifecycle(
-        node =>
-          new Promise(resolve => {
-            testNode = node;
+  includeFilePaths.forEach(filePath => {
+    testSuitePromise = testSuitePromise.then(() => {
+      const runTestLifecycle = (node: TestNode) =>
+        new Promise<void>(resolve => {
+          testNode = node;
 
-            const worker = cluster.fork();
-
-            worker.on('message', handleMessage);
-            worker.on('error', error => {
+          const worker = startWorker({
+            onMessage: handleMessage,
+            onError(error) {
               handlers.onTestFatalError(testNode, error);
-            });
-            worker.on('exit', resolve);
+            },
+            onExit: resolve,
+          });
 
-            const message: TestLifecycleInitMessage = {
-              type: MessageType.TEST_LIFECYCLE_INIT,
-              filePath,
-              testPath: getTestPath(node),
-              setupFilePaths,
-              testOptions: config.testOptions,
-            };
+          worker.postMessage({
+            type: 'testLifecycleInit',
+            filePath,
+            testPath: getTestPath(node),
+            setupFilePaths,
+            testOptions,
+          });
+        });
 
-            worker.send(message);
-          }),
-        handlers,
-        options
-      );
+      const lifecycle = createTestSuiteLifecycle(runTestLifecycle, handlers, { testNamePatterns });
 
-      // Register globals
-      Object.assign(global, lifecycle.runtime);
+      // Load runtime
+      let lifecyclePromise = new Promise(resolve => resolve(loadRuntime(lifecycle.runtime)));
 
-      // Setup
-      setupFilePaths?.forEach(require);
+      // Load setup files
+      setupFilePaths?.forEach(filePath => {
+        lifecyclePromise = lifecyclePromise.then(() => loadFile(filePath));
+      });
 
-      // Run test suite
-      require(filePath);
-
-      return lifecycle.run().catch(error => handlers.onTestSuiteError(lifecycle.node, error));
+      // Load and run the test suite
+      return lifecyclePromise
+        .then(() => loadFile(filePath))
+        .then(() => lifecycle.run())
+        .catch(error => handlers.onTestSuiteError(lifecycle.node, error));
     });
-  }
-
-  // Kill the process after completion
-  filePromise.then(() => {
-    process.exit(0);
   });
+
+  testSuitePromise.then(tearDown);
 }

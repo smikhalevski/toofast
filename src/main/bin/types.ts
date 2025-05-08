@@ -1,76 +1,6 @@
 import { TestOptions } from '../types.js';
 import { DescribeNode, TestNode, TestSuiteNode } from '../createTestSuiteLifecycle.js';
-
-export interface Config {
-  /**
-   * The default test options.
-   */
-  testOptions?: TestOptions;
-
-  /**
-   * The array of glob patterns of included test files.
-   */
-  include?: string[];
-
-  /**
-   * The array of glob patters of files that are evaluated in the test environment before any test suites are run.
-   */
-  setupFiles?: string[];
-}
-
-/**
- * Population statistics passed between master and fork processes.
- */
-export interface Stats {
-  /**
-   * The total number of measurements in the population.
-   */
-  size: number;
-
-  /**
-   * The mean value.
-   */
-  mean: number;
-
-  /**
-   * The expectation of the squared deviation of a random variable from its mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
-   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance}
-   */
-  variance: number;
-
-  /**
-   * The standard deviation is a measure of the amount of variation or dispersion of a set of values.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
-   */
-  sd: number;
-
-  /**
-   * The standard error of the mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
-   */
-  sem: number;
-
-  /**
-   * The margin of error.
-   */
-  moe: number;
-
-  /**
-   * The relative margin of error [0, 1].
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
-   */
-  rme: number;
-
-  /**
-   * The number of executions per second.
-   */
-  hz: number;
-}
+import { HistogramStats } from '../Histogram.js';
 
 export interface MasterLifecycleHandlers {
   onDescribeStart(node: DescribeNode): void;
@@ -79,7 +9,7 @@ export interface MasterLifecycleHandlers {
 
   onTestStart(node: TestNode): void;
 
-  onTestEnd(node: TestNode, durationStats: Stats, memoryStats: Stats): void;
+  onTestEnd(node: TestNode, durationStats: HistogramStats, memoryStats: HistogramStats): void;
 
   onTestFatalError(node: TestNode, error: any): void;
 
@@ -91,7 +21,7 @@ export interface MasterLifecycleHandlers {
 
   onMeasureStart(node: TestNode): void;
 
-  onMeasureEnd(node: TestNode, stats: Stats): void;
+  onMeasureEnd(node: TestNode, stats: HistogramStats): void;
 
   onMeasureError(node: TestNode, error: any): void;
 
@@ -141,21 +71,8 @@ export type WorkerMessage =
 
 export type MasterMessage = TestLifecycleInitMessage;
 
-export const enum MessageType {
-  TEST_LIFECYCLE_INIT = 'testLifecycleInit',
-  TEST_START = 'testStart',
-  TEST_END = 'testEnd',
-  TEST_FATAL_ERROR = 'testFatalError',
-  MEASURE_WARMUP_START = 'measureWarmupStart',
-  MEASURE_WARMUP_END = 'measureWarmupEnd',
-  MEASURE_START = 'measureStart',
-  MEASURE_END = 'measureEnd',
-  MEASURE_ERROR = 'measureError',
-  MEASURE_PROGRESS = 'measureProgress',
-}
-
 export interface TestLifecycleInitMessage {
-  type: MessageType.TEST_LIFECYCLE_INIT;
+  type: 'testLifecycleInit';
   filePath: string;
   testPath: number[];
   setupFilePaths: string[] | undefined;
@@ -163,43 +80,43 @@ export interface TestLifecycleInitMessage {
 }
 
 export interface TestStartMessage {
-  type: MessageType.TEST_START;
+  type: 'testStart';
 }
 
 export interface TestEndMessage {
-  type: MessageType.TEST_END;
-  durationStats: Stats;
-  memoryStats: Stats;
+  type: 'testEnd';
+  durationStats: HistogramStats;
+  memoryStats: HistogramStats;
 }
 
 export interface TestFatalErrorMessage {
-  type: MessageType.TEST_FATAL_ERROR;
+  type: 'testFatalError';
   message: string;
 }
 
 export interface MeasureWarmupStartMessage {
-  type: MessageType.MEASURE_WARMUP_START;
+  type: 'measureWarmupStart';
 }
 
 export interface MeasureWarmupEndMessage {
-  type: MessageType.MEASURE_WARMUP_END;
+  type: 'measureWarmupEnd';
 }
 
 export interface MeasureStartMessage {
-  type: MessageType.MEASURE_START;
+  type: 'measureStart';
 }
 
 export interface MeasureEndMessage {
-  type: MessageType.MEASURE_END;
-  stats: Stats;
+  type: 'measureEnd';
+  stats: HistogramStats;
 }
 
 export interface MeasureErrorMessage {
-  type: MessageType.MEASURE_ERROR;
-  message: string;
+  type: 'measureError';
+  errorMessage: string;
 }
 
 export interface MeasureProgressMessage {
-  type: MessageType.MEASURE_PROGRESS;
+  type: 'measureProgress';
   percent: number;
 }

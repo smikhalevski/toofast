@@ -7,15 +7,15 @@ export type SyncHook = () => void;
 export type MountSyncHook = (hook: SyncHook) => void;
 
 export interface Describe {
-  (label: string, cb: () => void): void;
+  (name: string, cb: () => void): void;
 
-  (label: string, options: TestOptions, cb: () => void): void;
+  (name: string, options: TestOptions, cb: () => void): void;
 }
 
 export interface Test {
-  (label: string, cb: TestCallback): void;
+  (name: string, cb: TestCallback): void;
 
-  (label: string, options: TestOptions, cb: TestCallback): void;
+  (name: string, options: TestOptions, cb: TestCallback): void;
 }
 
 export type TestCallback = (measure: Measure) => PromiseLike<void> | void;

@@ -9,14 +9,14 @@ export interface TestSuiteNode {
 export interface DescribeNode {
   type: 'describe';
   parent: TestSuiteNode | DescribeNode;
-  label: string;
+  name: string;
   children: Array<DescribeNode | TestNode>;
 }
 
 export interface TestNode {
   type: 'test';
   parent: TestSuiteNode | DescribeNode;
-  label: string;
+  name: string;
   isEnabled: boolean;
 }
 
@@ -53,7 +53,7 @@ export interface TestSuiteLifecycle {
 
 export interface TestSuiteLifecycleOptions {
   /**
-   * The list of test label patterns that must be run. If omitted then all tests are run.
+   * The list of test name patterns that must be run. If omitted then all tests are run.
    */
   testNamePatterns?: RegExp[];
 }
@@ -88,11 +88,11 @@ export function createTestSuiteLifecycle(
     beforeIteration: noop,
     afterIteration: noop,
 
-    describe(label) {
+    describe(name) {
       const node: DescribeNode = {
         type: 'describe',
         parent,
-        label,
+        name,
         children: [],
       };
 
@@ -120,18 +120,18 @@ export function createTestSuiteLifecycle(
       parent = node.parent;
     },
 
-    test(label) {
+    test(name) {
       const node: TestNode = {
         type: 'test',
         parent,
-        label,
+        name,
         isEnabled: true,
       };
 
       parent.children.push(node);
 
       if (testNamePatterns) {
-        node.isEnabled = testNamePatterns.some(pattern => isMatchingLabel(node, pattern));
+        node.isEnabled = testNamePatterns.some(pattern => isMatchingName(node, pattern));
       }
 
       lifecyclePromise = lifecyclePromise.then(() => {
@@ -152,8 +152,8 @@ export function createTestSuiteLifecycle(
   };
 }
 
-function isMatchingLabel(node: DescribeNode | TestNode, pattern: RegExp): boolean {
-  return pattern.test(node.label) || (node.parent.type !== 'testSuite' && isMatchingLabel(node.parent, pattern));
+function isMatchingName(node: DescribeNode | TestNode, pattern: RegExp): boolean {
+  return pattern.test(node.name) || (node.parent.type !== 'testSuite' && isMatchingName(node.parent, pattern));
 }
 
 function hasEnabledTests(node: DescribeNode): boolean {

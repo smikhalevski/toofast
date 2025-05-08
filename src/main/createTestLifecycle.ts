@@ -11,6 +11,7 @@ import {
   TestCallback,
   TestOptions,
 } from './types.js';
+import { callHooks, combineHooks, combineSyncHooks } from './utils.js';
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
@@ -180,37 +181,5 @@ export function createTestLifecycle(
       runLifecycle();
       return lifecyclePromise;
     },
-  };
-}
-
-function callHooks(hooks: Hook[] | undefined): Promise<void> | undefined {
-  if (hooks === undefined) {
-    return;
-  }
-
-  let promise = Promise.resolve();
-
-  for (const hook of hooks) {
-    promise = promise.then(hook);
-  }
-  return promise;
-}
-
-function combineHooks(hooks: Hook[] | undefined, hook: Hook | undefined): Hook | undefined {
-  if (hooks === undefined && hook === undefined) {
-    return;
-  }
-  return () => Promise.resolve(callHooks(hooks)).then(hook);
-}
-
-function combineSyncHooks(hooks: SyncHook[] | undefined, hook: SyncHook | undefined): SyncHook | undefined {
-  if (hooks === undefined) {
-    return hook;
-  }
-  return () => {
-    for (const hook of hooks) {
-      hook();
-    }
-    hook?.();
   };
 }

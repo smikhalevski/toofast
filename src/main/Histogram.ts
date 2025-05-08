@@ -1,12 +1,63 @@
 import { Adder } from './Adder.js';
 
 /**
+ * Population statistics passed between master and fork processes.
+ */
+export interface HistogramStats {
+  /**
+   * The total number of measurements in the population.
+   */
+  readonly size: number;
+
+  /**
+   * The mean value.
+   */
+  readonly mean: number;
+
+  /**
+   * The expectation of the squared deviation of a random variable from its mean.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
+   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance}
+   */
+  readonly variance: number;
+
+  /**
+   * The standard deviation is a measure of the amount of variation or dispersion of a set of values.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
+   */
+  readonly sd: number;
+
+  /**
+   * The standard error of the mean.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
+   */
+  readonly sem: number;
+
+  /**
+   * The margin of error.
+   */
+  readonly moe: number;
+
+  /**
+   * The relative margin of error [0, 1].
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
+   */
+  readonly rme: number;
+
+  /**
+   * The number of executions per second.
+   */
+  readonly hz: number;
+}
+
+/**
  * Provides access to mutable population statistics.
  */
-export class Histogram {
-  /**
-   * The total number of added measurements.
-   */
+export class Histogram implements HistogramStats {
   size = 0;
 
   /**
@@ -19,68 +70,38 @@ export class Histogram {
    */
   private readonly _sqAdder = new Adder();
 
-  /**
-   * The mean value.
-   */
   get mean(): number {
     const { size, _adder } = this;
 
     return size === 0 ? 0 : _adder.sum / size;
   }
 
-  /**
-   * The expectation of the squared deviation of a random variable from its mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
-   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance}
-   */
   get variance(): number {
     const { size, _sqAdder, _adder } = this;
 
     return size === 0 ? 0 : (_sqAdder.sum - (_adder.sum * _adder.sum) / size) / size;
   }
 
-  /**
-   * The standard deviation is a measure of the amount of variation or dispersion of a set of values.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
-   */
   get sd(): number {
     return Math.sqrt(this.variance);
   }
 
-  /**
-   * The standard error of the mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
-   */
   get sem(): number {
     const { size } = this;
 
     return size === 0 ? 0 : this.sd / Math.sqrt(size);
   }
 
-  /**
-   * The margin of error.
-   */
   get moe(): number {
     const { size } = this;
 
     return size === 0 ? 0 : this.sem * tTable[Math.min(size, tTable.length) - 1];
   }
 
-  /**
-   * The relative margin of error [0, 1].
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
-   */
   get rme(): number {
     return this.size === 0 ? 0 : this.moe / this.mean;
   }
 
-  /**
-   * The number of executions per second.
-   */
   get hz(): number {
     return this.size === 0 ? 0 : 1000 / this.mean;
   }
@@ -111,6 +132,15 @@ export class Histogram {
     }
 
     this.size++;
+  }
+
+  /**
+   * Returns the snapshot of the current histogram stats.
+   */
+  getStats(): HistogramStats {
+    const { size, mean, variance, sd, sem, moe, rme, hz } = this;
+
+    return { size, mean, variance, sd, sem, moe, rme, hz };
   }
 }
 

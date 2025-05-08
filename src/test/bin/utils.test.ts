@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main/index.js';
-import { getLabelLength, getTestPath } from '../../main/bin/utils.js';
+import { getNameLength, getTestPath } from '../../main/bin/utils.js';
 
 describe('getTestPath', () => {
   test('returns path of the nested test', () => {
@@ -18,8 +18,8 @@ describe('getTestPath', () => {
   });
 });
 
-describe('getLabelLength', () => {
-  test('returns the maximum label length', () => {
+describe('getNameLength', () => {
+  test('returns the maximum name length', () => {
     const lifecycle = createTestSuiteLifecycle(() => Promise.resolve());
     const r = lifecycle.runtime;
 
@@ -29,6 +29,6 @@ describe('getLabelLength', () => {
       r.test('bbb', () => undefined);
     });
 
-    expect(getLabelLength((lifecycle.node.children[0] as DescribeNode).children[1] as TestNode)).toBe(6);
+    expect(getNameLength((lifecycle.node.children[0] as DescribeNode).children[1] as TestNode)).toBe(6);
   });
 });

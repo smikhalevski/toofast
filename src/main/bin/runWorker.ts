@@ -1,96 +1,110 @@
 import { createTestLifecycle, TestLifecycleHandlers } from '../createTestLifecycle.js';
 import { runMeasureLifecycle } from '../runMeasureLifecycle.js';
-import { MasterMessage, MessageType, WorkerMessage } from './types.js';
-import { getErrorMessage, handleMasterMessage, toStats } from './utils.js';
+import { MasterMessage, WorkerMessage } from './types.js';
+import { getErrorMessage, handleMasterMessage } from './utils.js';
+import { Runtime } from '../types.js';
+
+export interface RunWorkerOptions {
+  postMessage: (message: WorkerMessage) => void;
+  subscribeToMessage: (listener: (message: MasterMessage) => void) => void;
+  loadFile: (filePath: string) => Promise<void> | void;
+  loadRuntime: (runtime: Runtime) => Promise<void> | void;
+  tearDown: () => void;
+}
 
 /**
- * Runs worker that waits for test init message and sends lifecycle messages to parent process.
+ * Runs worker that waits for the test init message and sends lifecycle messages.
  */
-export function runWorker(): void {
-  const send: (message: WorkerMessage) => void = message => process.send!(message);
+export function runWorker(options: RunWorkerOptions): void {
+  const { postMessage, subscribeToMessage, loadFile, loadRuntime, tearDown } = options;
 
   let prevPercent: number;
   let prevErrorMessage: string;
 
   const handlers: TestLifecycleHandlers = {
     onTestStart() {
-      send({
-        type: MessageType.TEST_START,
+      postMessage({
+        type: 'testStart',
       });
     },
     onTestEnd(durationHistogram, memoryHistogram) {
-      send({
-        type: MessageType.TEST_END,
-        durationStats: toStats(durationHistogram),
-        memoryStats: toStats(memoryHistogram),
+      postMessage({
+        type: 'testEnd',
+        durationStats: durationHistogram.getStats(),
+        memoryStats: memoryHistogram.getStats(),
       });
     },
     onMeasureWarmupStart() {
-      send({
-        type: MessageType.MEASURE_WARMUP_START,
+      postMessage({
+        type: 'measureWarmupStart',
       });
     },
     onMeasureWarmupEnd() {
-      send({
-        type: MessageType.MEASURE_WARMUP_END,
+      postMessage({
+        type: 'measureWarmupEnd',
       });
     },
     onMeasureStart() {
-      send({
-        type: MessageType.MEASURE_START,
+      postMessage({
+        type: 'measureStart',
       });
     },
     onMeasureEnd(histogram) {
-      send({
-        type: MessageType.MEASURE_END,
-        stats: toStats(histogram),
+      postMessage({
+        type: 'measureEnd',
+        stats: histogram.getStats(),
       });
     },
     onMeasureError(error) {
       const errorMessage = getErrorMessage(error);
-      if (prevErrorMessage !== errorMessage) {
-        send({
-          type: MessageType.MEASURE_ERROR,
-          message: (prevErrorMessage = errorMessage),
-        });
+
+      if (prevErrorMessage === errorMessage) {
+        return;
       }
+      postMessage({
+        type: 'measureError',
+        errorMessage: (prevErrorMessage = errorMessage),
+      });
     },
     onMeasureProgress(percent) {
-      const nextPercent = Math.round(percent * 100) / 100;
-      if (prevPercent !== nextPercent) {
-        send({
-          type: MessageType.MEASURE_PROGRESS,
-          percent: (prevPercent = nextPercent),
-        });
+      const nextPercent = Math.round(percent * 1000) / 1000;
+
+      if (prevPercent === nextPercent) {
+        return;
       }
+      postMessage({
+        type: 'measureProgress',
+        percent: (prevPercent = nextPercent),
+      });
     },
   };
 
-  process.on('message', (message: MasterMessage) =>
+  subscribeToMessage(message =>
     handleMasterMessage(message, {
       onTestLifecycleInitMessage(message) {
         const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers, message.testOptions);
 
-        // Register globals
-        Object.assign(global, lifecycle.runtime);
+        // Load runtime
+        let lifecyclePromise = new Promise(resolve => resolve(loadRuntime(lifecycle.runtime)));
 
-        // Setup
-        message.setupFilePaths?.forEach(require);
+        // Load setup files
+        message.setupFilePaths?.forEach(filePath => {
+          lifecyclePromise = lifecyclePromise.then(() => loadFile(filePath));
+        });
 
-        // Run test
-        require(message.filePath);
+        // Load tests
+        lifecyclePromise.then(() => loadFile(message.filePath));
 
-        lifecycle
-          .run()
+        // Run tests
+        lifecyclePromise
+          .then(() => lifecycle.run())
           .catch(error => {
-            send({
-              type: MessageType.TEST_FATAL_ERROR,
+            postMessage({
+              type: 'testFatalError',
               message: getErrorMessage(error),
             });
           })
-          .then(() => {
-            process.exit(0);
-          });
+          .then(tearDown);
       },
     })
   );

@@ -52,14 +52,14 @@ test('assembles nodes', () => {
     type: 'describe',
     parent: node,
     children: [],
-    label: '0',
+    name: '0',
   };
   node.children.push(node0);
 
   const node00: TestNode = {
     type: 'test',
     parent: node0,
-    label: '0.0',
+    name: '0.0',
     isEnabled: true,
   };
   node0.children.push(node00);
@@ -68,7 +68,7 @@ test('assembles nodes', () => {
     type: 'describe',
     parent: node,
     children: [],
-    label: '1',
+    name: '1',
   };
   node.children.push(node1);
 
@@ -76,14 +76,14 @@ test('assembles nodes', () => {
     type: 'describe',
     parent: node1,
     children: [],
-    label: '1.0',
+    name: '1.0',
   };
   node1.children.push(node10);
 
   const node100: TestNode = {
     type: 'test',
     parent: node10,
-    label: '1.0.0',
+    name: '1.0.0',
     isEnabled: true,
   };
   node10.children.push(node100);
@@ -92,14 +92,14 @@ test('assembles nodes', () => {
     type: 'describe',
     parent: node1,
     children: [],
-    label: '1.1',
+    name: '1.1',
   };
   node1.children.push(node11);
 
   const node110: TestNode = {
     type: 'test',
     parent: node11,
-    label: '1.1.0',
+    name: '1.1.0',
     isEnabled: true,
   };
   node11.children.push(node110);
@@ -107,7 +107,7 @@ test('assembles nodes', () => {
   const node111: TestNode = {
     type: 'test',
     parent: node11,
-    label: '1.1.1',
+    name: '1.1.1',
     isEnabled: true,
   };
   node11.children.push(node111);
@@ -115,7 +115,7 @@ test('assembles nodes', () => {
   const node2: TestNode = {
     type: 'test',
     parent: node,
-    label: '2',
+    name: '2',
     isEnabled: true,
   };
   node.children.push(node2);
