@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main/index.js';
-import { getNameLength, getTestPath } from '../../main/bin/utils.js';
+import { getNameLength, getTestPath } from '../../main/runner/utils.js';
 
 describe('getTestPath', () => {
   test('returns path of the nested test', () => {

@@ -3,7 +3,7 @@ import * as d from 'doubter';
 import globToRegExp from 'glob-to-regexp';
 import { parseArgs } from 'argcat';
 import { TestOptions } from '../types.js';
-import { loadFile } from './utils.js';
+import { loadFile } from '../runner/utils.js';
 import { globSync } from 'fs';
 
 const CONFIG_FILE_PATHS = [

@@ -1,7 +1,7 @@
 import { bold, dim, green, red, yellow } from 'kleur/colors';
 import rl from 'readline';
-import { MasterLifecycleHandlers } from './types.js';
-import { getErrorMessage, getNameLength } from './utils.js';
+import { MasterLifecycleHandlers } from '../runner/types.js';
+import { getErrorMessage, getNameLength } from '../runner/utils.js';
 
 const MESSAGE_PADDING = '  ';
 const MESSAGE_PENDING = dim('○ ');

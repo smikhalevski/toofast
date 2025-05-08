@@ -1,10 +1,10 @@
 // #!/usr/bin/env node
 import cluster from 'cluster';
 import { createLoggingHandlers } from './createLoggingHandlers.js';
-import { runMaster } from './runMaster.js';
-import { runWorker } from './runWorker.js';
+import { runMaster } from '../runner/runMaster.js';
+import { runWorker } from '../runner/runWorker.js';
 import { loadConfig } from './loadConfig.js';
-import { loadFile } from './utils.js';
+import { loadFile } from '../runner/utils.js';
 
 if (cluster.isWorker) {
   runWorker({
