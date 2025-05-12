@@ -1,10 +1,6 @@
 export type Hook = () => PromiseLike<void> | void;
 
-export type MountHook = (hook: Hook) => void;
-
-export type SyncHook = () => void;
-
-export type MountSyncHook = (hook: SyncHook) => void;
+export type RegisterHook = (hook: Hook) => void;
 
 export interface Describe {
   (name: string, cb: () => void): void;
@@ -74,31 +70,31 @@ export interface MeasureOptions extends TestOptions {
   afterWarmup?: Hook;
   beforeBatch?: Hook;
   afterBatch?: Hook;
-  beforeIteration?: SyncHook;
-  afterIteration?: SyncHook;
+  beforeIteration?: Hook;
+  afterIteration?: Hook;
 }
 
 /**
  * Functions that are exposed in a test script.
  */
 export interface Runtime {
-  beforeEach: MountHook;
-  afterEach: MountHook;
-  afterWarmup: MountHook;
-  beforeBatch: MountHook;
-  afterBatch: MountHook;
-  beforeIteration: MountSyncHook;
-  afterIteration: MountSyncHook;
+  beforeEach: RegisterHook;
+  afterEach: RegisterHook;
+  afterWarmup: RegisterHook;
+  beforeBatch: RegisterHook;
+  afterBatch: RegisterHook;
+  beforeIteration: RegisterHook;
+  afterIteration: RegisterHook;
   describe: Describe;
   test: Test;
 }
 
-declare const beforeEach: MountHook;
-declare const afterEach: MountHook;
-declare const afterWarmup: MountHook;
-declare const beforeBatch: MountHook;
-declare const afterBatch: MountHook;
-declare const beforeIteration: MountSyncHook;
-declare const afterIteration: MountSyncHook;
+declare const beforeEach: RegisterHook;
+declare const afterEach: RegisterHook;
+declare const afterWarmup: RegisterHook;
+declare const beforeBatch: RegisterHook;
+declare const afterBatch: RegisterHook;
+declare const beforeIteration: RegisterHook;
+declare const afterIteration: RegisterHook;
 declare const describe: Describe;
 declare const test: Test;

@@ -20,9 +20,9 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
   return {
     onDescribeStart(node) {
       if (node.parent.type !== 'testSuite' || node.parent.children[0] !== node) {
-        write(NEW_LINE);
+        print(NEW_LINE);
       }
-      write(MESSAGE_PADDING.repeat(depth) + bold(node.name) + NEW_LINE);
+      print(MESSAGE_PADDING.repeat(depth) + bold(node.name) + NEW_LINE);
       ++depth;
     },
 
@@ -31,10 +31,10 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     },
 
     onTestStart(node) {
-      if (errorMessage !== null) {
-        write(NEW_LINE + NEW_LINE);
+      if (errorMessage !== undefined) {
+        print(NEW_LINE + NEW_LINE);
       } else if (node.parent.children[node.parent.children.indexOf(node) - 1]?.type === 'describe') {
-        write(NEW_LINE);
+        print(NEW_LINE);
       }
 
       testName = node.name.padEnd(getNameLength(node));
@@ -42,12 +42,12 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
       errorMessage = undefined;
 
       clearLine();
-      write(MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING + testName + MESSAGE_PADDING);
+      print(MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING + testName + MESSAGE_PADDING);
     },
 
     onTestEnd(_node, durationStats, memoryStats) {
       clearLine();
-      write(
+      print(
         MESSAGE_PADDING.repeat(depth) +
           (errorMessage ? MESSAGE_ERROR : MESSAGE_SUCCESS) +
           testName +
@@ -65,16 +65,16 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
     onTestFatalError(_node, error) {
       errorMessage = getErrorMessage(error);
       clearLine();
-      write(MESSAGE_PADDING.repeat(depth) + MESSAGE_ERROR + testName + NEW_LINE + red(errorMessage));
+      print(MESSAGE_PADDING.repeat(depth) + MESSAGE_ERROR + testName + NEW_LINE + red(errorMessage));
     },
 
     onTestSuiteError(_node, error) {
-      write(NEW_LINE + NEW_LINE + red(getErrorMessage(error)));
+      print(NEW_LINE + NEW_LINE + red(getErrorMessage(error)));
     },
 
     onMeasureWarmupStart(_node) {
       clearLine();
-      write(
+      print(
         MESSAGE_PADDING.repeat(depth) +
           MESSAGE_WARMUP +
           testName +
@@ -100,7 +100,7 @@ export function createLoggingHandlers(): MasterLifecycleHandlers {
 
     onMeasureProgress(_node, percent) {
       clearLine();
-      write(
+      print(
         MESSAGE_PADDING.repeat(depth) +
           (errorMessage ? MESSAGE_PENDING_ERROR : MESSAGE_PENDING) +
           testName +
@@ -177,6 +177,6 @@ function clearLine(): void {
   rl.cursorTo(process.stdout, 0);
 }
 
-function write(message: string): void {
+function print(message: string): void {
   process.stdout.write(message);
 }

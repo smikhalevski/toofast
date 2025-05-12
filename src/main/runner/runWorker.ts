@@ -6,9 +6,9 @@ import { Runtime } from '../types.js';
 
 export interface RunWorkerOptions {
   postMessage: (message: WorkerMessage) => void;
-  subscribeToMessage: (listener: (message: MasterMessage) => void) => void;
-  loadFile: (filePath: string) => Promise<void> | void;
-  loadRuntime: (runtime: Runtime) => Promise<void> | void;
+  addMessageListener: (listener: (message: MasterMessage) => void) => void;
+  importFile: (file: string) => Promise<void> | void;
+  injectRuntime: (file: string, runtime: Runtime) => Promise<void> | void;
   tearDown: () => void;
 }
 
@@ -16,7 +16,7 @@ export interface RunWorkerOptions {
  * Runs worker that waits for the test init message and sends lifecycle messages.
  */
 export function runWorker(options: RunWorkerOptions): void {
-  const { postMessage, subscribeToMessage, loadFile, loadRuntime, tearDown } = options;
+  const { postMessage, addMessageListener, importFile, injectRuntime, tearDown } = options;
 
   let prevPercent: number;
   let prevErrorMessage: string;
@@ -79,33 +79,39 @@ export function runWorker(options: RunWorkerOptions): void {
     },
   };
 
-  subscribeToMessage(message =>
+  addMessageListener(message => {
     handleMasterMessage(message, {
-      onTestLifecycleInitMessage(message) {
-        const lifecycle = createTestLifecycle(message.testPath, runMeasureLifecycle, handlers, message.testOptions);
+      async onTestLifecycleInitMessage(message) {
+        try {
+          const lifecycle = createTestLifecycle({
+            runMeasureLifecycle,
+            testLocation: message.testLocation,
+            testOptions: message.testOptions,
+            handlers,
+          });
 
-        // Load runtime
-        let lifecyclePromise = new Promise(resolve => resolve(loadRuntime(lifecycle.runtime)));
+          await injectRuntime(message.file, lifecycle.runtime);
 
-        // Load setup files
-        message.setupFilePaths?.forEach(filePath => {
-          lifecyclePromise = lifecyclePromise.then(() => loadFile(filePath));
-        });
+          for (const file of message.setupFiles) {
+            await importFile(file);
+          }
 
-        // Load tests
-        lifecyclePromise.then(() => loadFile(message.filePath));
+          await importFile(message.file);
 
-        // Run tests
-        lifecyclePromise
-          .then(() => lifecycle.run())
-          .catch(error => {
-            postMessage({
-              type: 'testFatalError',
-              message: getErrorMessage(error),
-            });
-          })
-          .then(tearDown);
+          await lifecycle.run();
+        } catch (error) {
+          postMessage({
+            type: 'testFatalError',
+            message: getErrorMessage(error),
+          });
+        }
+
+        tearDown();
       },
-    })
-  );
+    });
+  });
+
+  postMessage({
+    type: 'ready',
+  });
 }

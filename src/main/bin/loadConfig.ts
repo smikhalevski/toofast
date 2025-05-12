@@ -4,19 +4,10 @@ import * as d from 'doubter';
 import globToRegExp from 'glob-to-regexp';
 import { parseArgs } from 'argcat';
 import { TestOptions } from '../types.js';
-import { loadFile } from './loadFile.js';
 
-const DEFAULT_CONFIG_FILE_PATHS = [
-  '.toofastrc',
-  'toofast.json',
-  'toofast.config.json',
-  'toofast.config.js',
-  'toofast.config.mjs',
-  'toofast.config.ts',
-  'toofast.config.mts',
-];
+const CONFIG_FILE_PATHS = ['.toofastrc', 'toofast.json', 'toofast.config.json'];
 
-const DEFAULT_INCLUDE = ['**/*.perf.js', '**/*.perf.mjs', '**/*.perf.ts', '**/*.perf.mts'];
+const INCLUDE_GLOBS = ['**/*.perf.js', '**/*.perf.mjs', '**/*.perf.ts', '**/*.perf.mts'];
 
 /**
  * Shape of CLI arguments.
@@ -32,10 +23,10 @@ const argsShape = d
     // Array of setup file globs
     setup: d.array(d.string()),
 
-    // Array of test name globs
+    // Array of test name globs to enable
     '': d.array(d.string()),
 
-    // Test options overrides
+    // CLI arguments override test options from config file
     measureTimeout: d.number().int().positive().coerce(),
     targetRme: d.number().gt(0).lt(1).coerce(),
     warmupIterationCount: d.number().int().positive().coerce(),
@@ -66,7 +57,7 @@ const testOptionsShape = d
 /**
  * Shape of a config read from a file.
  */
-export const configShape = d
+export const rcShape = d
   .object({
     testOptions: testOptionsShape,
 
@@ -81,16 +72,16 @@ export const configShape = d
 /**
  * Parsed config consumed by the master runner.
  */
-interface ParsedConfig {
+interface Config {
   /**
    * The array of glob patters of files that are evaluated in the test environment before any test suites are run.
    */
-  setupFilePaths: string[] | undefined;
+  setupFiles: string[] | undefined;
 
   /**
    * The array of glob patterns of included test files.
    */
-  includeFilePaths: string[];
+  includeFiles: string[];
 
   /**
    * The list of test name patterns that must be run. If omitted then all tests are run.
@@ -108,34 +99,20 @@ interface ParsedConfig {
 /**
  * Parses CLI arguments and loads config from a file if needed.
  */
-export function loadConfig(): Promise<ParsedConfig> {
+export function loadConfig(): Config {
   const args = argsShape.parse(parseArgs(process.argv.slice(2)));
 
-  const configFilePath = args.config || DEFAULT_CONFIG_FILE_PATHS.find(filePath => fs.existsSync(filePath));
+  const configFile = args.config || CONFIG_FILE_PATHS.find(file => fs.existsSync(file));
 
-  if (configFilePath === undefined) {
-    // Zero config
-    return Promise.resolve(parseConfig(args, {}));
-  }
+  const config = configFile === undefined ? {} : rcShape.parse(JSON.parse(fs.readFileSync(configFile, 'utf8')));
 
-  return loadFile(configFilePath)
-    .then(configShape.parse)
-    .then(config => parseConfig(args, config));
-}
-
-function parseConfig(args: d.Output<typeof argsShape>, config: d.Output<typeof configShape>): ParsedConfig {
   const setup = args.setup || config.setup;
-  const include = args.include || config.include || DEFAULT_INCLUDE;
-
-  const setupFilePaths = setup?.flatMap(pattern => glob.sync(pattern, { absolute: true }));
-  const includeFilePaths = include.flatMap(pattern => glob.sync(pattern, { absolute: true }));
-
-  const testNamePatterns = args['']?.map(pattern => globToRegExp(pattern, { flags: 'i' }));
+  const include = args.include || config.include || INCLUDE_GLOBS;
 
   return {
-    setupFilePaths,
-    includeFilePaths,
-    testNamePatterns,
+    setupFiles: setup?.flatMap(pattern => glob.sync(pattern, { absolute: true })),
+    includeFiles: include.flatMap(pattern => glob.sync(pattern, { absolute: true })),
+    testNamePatterns: args['']?.map(pattern => globToRegExp(pattern, { flags: 'i' })),
     testOptions: { ...config.testOptions, ...args },
   };
 }

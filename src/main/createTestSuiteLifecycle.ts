@@ -20,21 +20,9 @@ export interface TestNode {
   isEnabled: boolean;
 }
 
-export interface TestSuiteLifecycleHandlers {
-  /**
-   * Triggered before the `describe` block is run.
-   */
-  onDescribeStart?(node: DescribeNode): void;
-
-  /**
-   * Triggered after the `describe` block is completed.
-   */
-  onDescribeEnd?(node: DescribeNode): void;
-}
-
 export interface TestSuiteLifecycle {
   /**
-   * The tree of test and declaration DSL nodes.
+   * The root node of the test suite.
    */
   node: TestSuiteNode;
 
@@ -51,31 +39,49 @@ export interface TestSuiteLifecycle {
   run(): Promise<void>;
 }
 
-export interface TestSuiteLifecycleOptions {
+export interface TestSuiteLifecycleHandlers {
   /**
-   * The list of test name patterns that must be run. If omitted then all tests are run.
+   * Triggered before the `describe` block is run.
    */
-  testNamePatterns?: RegExp[];
+  onDescribeStart?(node: DescribeNode): void;
+
+  /**
+   * Triggered after the `describe` block is completed.
+   */
+  onDescribeEnd?(node: DescribeNode): void;
 }
 
-export function createTestSuiteLifecycle(
-  runTestLifecycle: (node: TestNode) => Promise<void>,
-  handlers: TestSuiteLifecycleHandlers = {},
-  options: TestSuiteLifecycleOptions = {}
-): TestSuiteLifecycle {
-  const { onDescribeStart, onDescribeEnd } = handlers;
+export interface TestSuiteLifecycleOptions {
+  /**
+   * Runs tests described by a given node.
+   */
+  runTestLifecycle: (node: TestNode) => Promise<void> | void;
 
-  const { testNamePatterns } = options;
+  /**
+   * The list of test name patterns that must be run. If omitted or empty then all tests are run.
+   */
+  testNamePatterns?: RegExp[];
+
+  /**
+   * Callbacks that are invoked at different lifecycle stages.
+   */
+  handlers?: TestSuiteLifecycleHandlers;
+}
+
+/**
+ * Creates a tree of nodes and runs the lifecycle for each test node.
+ */
+export function createTestSuiteLifecycle(options: TestSuiteLifecycleOptions): TestSuiteLifecycle {
+  const { runTestLifecycle, testNamePatterns = [], handlers = {} } = options;
+
+  const { onDescribeStart, onDescribeEnd } = handlers;
 
   let runLifecycle: () => void;
   let lifecyclePromise = new Promise<void>(resolve => {
     runLifecycle = resolve;
   });
 
-  const node: TestSuiteNode = {
-    type: 'testSuite',
-    children: [],
-  };
+  const node: TestSuiteNode = { type: 'testSuite', children: [] };
 
   let parent: DescribeNode | TestSuiteNode = node;
 
@@ -89,17 +95,12 @@ export function createTestSuiteLifecycle(
     afterIteration: noop,
 
     describe(name) {
-      const node: DescribeNode = {
-        type: 'describe',
-        parent,
-        name,
-        children: [],
-      };
+      const node: DescribeNode = { type: 'describe', parent, name, children: [] };
 
       parent.children.push(node);
       parent = node;
 
-      if (onDescribeStart) {
+      if (onDescribeStart !== undefined) {
         lifecyclePromise = lifecyclePromise.then(() => {
           if (hasEnabledTests(node)) {
             return onDescribeStart(node);
@@ -107,9 +108,10 @@ export function createTestSuiteLifecycle(
         });
       }
 
+      // Callback provided to describe()
       arguments[typeof arguments[1] === 'function' ? 1 : 2]();
 
-      if (onDescribeEnd) {
+      if (onDescribeEnd !== undefined) {
         lifecyclePromise = lifecyclePromise.then(() => {
           if (hasEnabledTests(node)) {
             return onDescribeEnd(node);
@@ -121,16 +123,11 @@ export function createTestSuiteLifecycle(
     },
 
     test(name) {
-      const node: TestNode = {
-        type: 'test',
-        parent,
-        name,
-        isEnabled: true,
-      };
+      const node: TestNode = { type: 'test', parent, name, isEnabled: true };
 
       parent.children.push(node);
 
-      if (testNamePatterns) {
+      if (testNamePatterns.length !== 0) {
         node.isEnabled = testNamePatterns.some(pattern => isMatchingName(node, pattern));
       }
 

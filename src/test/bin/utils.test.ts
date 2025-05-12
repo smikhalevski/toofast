@@ -1,10 +1,10 @@
-import { describe, test, expect } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { createTestSuiteLifecycle, DescribeNode, TestNode } from '../../main/index.js';
-import { getNameLength, getTestPath } from '../../main/runner/utils.js';
+import { getNameLength, getTestLocation } from '../../main/runner/utils.js';
 
-describe('getTestPath', () => {
+describe('getTestLocation', () => {
   test('returns path of the nested test', () => {
-    const lifecycle = createTestSuiteLifecycle(() => Promise.resolve());
+    const lifecycle = createTestSuiteLifecycle({ runTestLifecycle: () => Promise.resolve() });
     const r = lifecycle.runtime;
 
     r.describe('0', () => {
@@ -13,14 +13,14 @@ describe('getTestPath', () => {
       r.test('0.1', () => undefined);
     });
 
-    expect(getTestPath(lifecycle.node.children[0])).toEqual([0]);
-    expect(getTestPath((lifecycle.node.children[0] as DescribeNode).children[1])).toEqual([0, 1]);
+    expect(getTestLocation(lifecycle.node.children[0])).toEqual([0]);
+    expect(getTestLocation((lifecycle.node.children[0] as DescribeNode).children[1])).toEqual([0, 1]);
   });
 });
 
 describe('getNameLength', () => {
   test('returns the maximum name length', () => {
-    const lifecycle = createTestSuiteLifecycle(() => Promise.resolve());
+    const lifecycle = createTestSuiteLifecycle({ runTestLifecycle: () => Promise.resolve() });
     const r = lifecycle.runtime;
 
     r.describe('', () => {

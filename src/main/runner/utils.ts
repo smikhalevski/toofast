@@ -3,6 +3,10 @@ import { DescribeNode, TestNode } from '../createTestSuiteLifecycle.js';
 
 export function handleWorkerMessage(message: WorkerMessage, handlers: WorkerMessageHandlers): true {
   switch (message.type) {
+    case 'ready':
+      handlers.onReady(message);
+      return true;
+
     case 'testStart':
       handlers.onTestStartMessage(message);
       return true;
@@ -53,20 +57,22 @@ export function getErrorMessage(error: any): string {
   return typeof error?.message === 'string' ? error.stack || error.message : String(error);
 }
 
-export function getTestPath(node: DescribeNode | TestNode): number[] {
-  const testPath: number[] = [];
+export function getTestLocation(node: DescribeNode | TestNode): number[] {
+  const testLocation: number[] = [];
 
   let parent = node.parent;
 
   while (true) {
-    testPath.unshift(parent.children.indexOf(node));
+    testLocation.unshift(parent.children.indexOf(node));
+
     if (parent.type === 'testSuite') {
       break;
     }
     node = parent;
     parent = parent.parent;
   }
-  return testPath;
+
+  return testLocation;
 }
 
 export function getNameLength(node: TestNode): number {

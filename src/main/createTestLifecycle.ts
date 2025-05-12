@@ -1,17 +1,21 @@
 import { Histogram } from './Histogram.js';
-import { MeasureLifecycleHandlers, RunMeasureLifecycle } from './runMeasureLifecycle.js';
-import {
-  Describe,
-  Hook,
-  Measure,
-  MeasureOptions,
-  Runtime,
-  SyncHook,
-  Test,
-  TestCallback,
-  TestOptions,
-} from './types.js';
-import { callHooks, combineHooks, combineSyncHooks } from './utils.js';
+import { MeasureLifecycleHandlers, MeasureLifecycleOptions, MeasureResult } from './runMeasureLifecycle.js';
+import { Describe, Hook, Measure, MeasureOptions, Runtime, Test, TestCallback, TestOptions } from './types.js';
+import { callHooks, combineHooks } from './utils.js';
+
+export interface TestLifecycle {
+  /**
+   * Functions that should be exposed as global in a test script.
+   */
+  runtime: Runtime;
+
+  /**
+   * Starts the test lifecycle execution.
+   *
+   * @returns The promise that resolves when the test lifecycle is completed.
+   */
+  run(): Promise<void>;
+}
 
 export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   /**
@@ -28,36 +32,34 @@ export interface TestLifecycleHandlers extends MeasureLifecycleHandlers {
   onTestEnd?(durationHistogram: Histogram, memoryHistogram: Histogram): void;
 }
 
-export interface TestLifecycle {
+export interface TestLifecycleOptions {
   /**
-   * Functions that should be exposed as global in a test script.
+   * Measures callback performance.
    */
-  runtime: Runtime;
+  runMeasureLifecycle: (options: MeasureLifecycleOptions) => Promise<MeasureResult>;
 
   /**
-   * Starts the test lifecycle execution.
-   *
-   * @returns The promise that resolves when the test lifecycle is completed.
+   * Indices of describe and test DSL blocks that must be run.
    */
-  run(): Promise<void>;
+  testLocation: readonly number[];
+
+  /**
+   * The default measure options.
+   */
+  testOptions?: TestOptions;
+
+  /**
+   * Callbacks that are invoked at different lifecycle stages.
+   */
+  handlers?: TestLifecycleHandlers;
 }
 
 /**
- * Creates a test protocol that executes a particular test.
- *
- * @param testPath Indices of describe and test DSL blocks that must be run.
- * @param runMeasureLifecycle Measures callback performance.
- * @param handlers Callbacks that are invoked at different lifecycle stages.
- * @param measureOptions The default measure options.
- *
- * @see {@link runMeasureLifecycle}
+ * Creates a test lifecycle that executes a single test.
  */
-export function createTestLifecycle(
-  testPath: readonly number[],
-  runMeasureLifecycle: RunMeasureLifecycle,
-  handlers: TestLifecycleHandlers = {},
-  measureOptions: TestOptions = {}
-): TestLifecycle {
+export function createTestLifecycle(options: TestLifecycleOptions): TestLifecycle {
+  const { runMeasureLifecycle, testLocation, handlers = {} } = options;
+
   const { onTestStart, onTestEnd } = handlers;
 
   let runLifecycle: () => void;
@@ -73,80 +75,93 @@ export function createTestLifecycle(
   let afterWarmupHooks: Hook[] | undefined;
   let beforeBatchHooks: Hook[] | undefined;
   let afterBatchHooks: Hook[] | undefined;
-  let beforeIterationHooks: SyncHook[] | undefined;
-  let afterIterationHooks: SyncHook[] | undefined;
+  let beforeIterationHooks: Hook[] | undefined;
+  let afterIterationHooks: Hook[] | undefined;
 
-  let isTestPending = false;
-
-  measureOptions = Object.assign({}, measureOptions);
+  // Prevent describe() and test() calls inside a test
+  let isTestFound = false;
+  let testOptions = options.testOptions;
 
   const describe: Describe = function () {
-    if (isTestPending || i >= testPath.length - 1 || j !== testPath[i]) {
+    if (isTestFound || i >= testLocation.length || j !== testLocation[i]) {
       j++;
       return;
     }
+
     i++;
     j = 0;
 
-    arguments[typeof arguments[1] === 'function' ? 1 : (Object.assign(measureOptions, arguments[1]), 2)]();
+    if (typeof arguments[1] === 'function') {
+      arguments[1]();
+    } else {
+      testOptions = { ...testOptions, ...arguments[1] };
+      arguments[2]();
+    }
   };
 
   const test: Test = function () {
-    if (isTestPending || i !== testPath.length - 1 || j !== testPath[i]) {
+    if (isTestFound || i >= testLocation.length || j !== testLocation[i]) {
       j++;
       return;
     }
-    i++;
 
-    const cb: TestCallback =
-      arguments[typeof arguments[1] === 'function' ? 1 : (Object.assign(measureOptions, arguments[1]), 2)];
+    isTestFound = true;
+
+    let testCallback: TestCallback = arguments[1];
+
+    if (typeof testCallback !== 'function') {
+      testOptions = { ...testOptions, ...arguments[1] };
+      testCallback = arguments[2];
+    }
 
     // Histograms that reflect population across all measurements
-    const testDurationHistogram = new Histogram();
-    const testMemoryHistogram = new Histogram();
+    const durationHistogram = new Histogram();
+    const memoryHistogram = new Histogram();
 
-    lifecyclePromise = lifecyclePromise.then(() => {
-      isTestPending = true;
+    lifecyclePromise = lifecyclePromise.then(async () => {
       onTestStart?.();
-      return callHooks(beforeEachHooks);
-    });
 
-    lifecyclePromise = lifecyclePromise.then(() => {
-      // Measure invocations must be sequential
-      let measureLifecyclePromise = Promise.resolve();
+      await callHooks(beforeEachHooks);
+
+      // Measure invocations are sequential
+      let measurePromise = Promise.resolve();
 
       const measure: Measure = function () {
-        let options: MeasureOptions | undefined;
+        let measureOptions: MeasureOptions | undefined;
+        let callback: () => void = arguments[0];
 
-        const cb: () => void = arguments[typeof arguments[0] === 'function' ? 0 : ((options = arguments[0]), 1)];
+        if (typeof callback !== 'function') {
+          measureOptions = arguments[0];
+          callback = arguments[1];
+        }
 
-        return (measureLifecyclePromise = measureLifecyclePromise
-          .then(() => {
-            options = Object.assign({}, measureOptions, options);
+        measurePromise = measurePromise.then(async () => {
+          measureOptions = { ...testOptions, ...measureOptions };
 
-            options.afterWarmup = combineHooks(afterWarmupHooks, options.afterWarmup);
-            options.beforeBatch = combineHooks(beforeBatchHooks, options.beforeBatch);
-            options.afterBatch = combineHooks(afterBatchHooks, options.afterBatch);
-            options.beforeIteration = combineSyncHooks(beforeIterationHooks, options.beforeIteration);
-            options.afterIteration = combineSyncHooks(afterIterationHooks, options.afterIteration);
+          measureOptions.afterWarmup = combineHooks(afterWarmupHooks, measureOptions.afterWarmup);
+          measureOptions.beforeBatch = combineHooks(beforeBatchHooks, measureOptions.beforeBatch);
+          measureOptions.afterBatch = combineHooks(afterBatchHooks, measureOptions.afterBatch);
+          measureOptions.beforeIteration = combineHooks(beforeIterationHooks, measureOptions.beforeIteration);
+          measureOptions.afterIteration = combineHooks(afterIterationHooks, measureOptions.afterIteration);
 
-            return runMeasureLifecycle(cb, handlers, options);
-          })
-          .then(result => {
-            testDurationHistogram.add(result.durationHistogram);
-            testMemoryHistogram.add(result.memoryHistogram);
-          }));
+          const result = await runMeasureLifecycle({ callback, handlers, measureOptions });
+
+          durationHistogram.add(result.durationHistogram);
+          memoryHistogram.add(result.memoryHistogram);
+        });
+
+        return measurePromise;
       };
 
-      // Always wait for measure calls to resolve
-      return Promise.resolve(cb(measure)).then(() => measureLifecyclePromise);
-    });
+      await testCallback(measure);
 
-    lifecyclePromise = lifecyclePromise
-      .then(() => callHooks(afterEachHooks))
-      .then(() => {
-        onTestEnd?.(testDurationHistogram, testMemoryHistogram);
-      });
+      // Await the completion of all measures
+      await measurePromise;
+
+      await callHooks(afterEachHooks);
+
+      onTestEnd?.(durationHistogram, memoryHistogram);
+    });
   };
 
   const runtime: Runtime = {

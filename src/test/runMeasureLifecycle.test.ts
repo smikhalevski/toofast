@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 import { MeasureLifecycleHandlers, runMeasureLifecycle } from '../main/index.js';
 
 const onMeasureWarmupStartMock = vi.fn();
@@ -27,13 +27,23 @@ beforeEach(() => {
 });
 
 test('returns a Promise', () => {
-  expect(runMeasureLifecycle(() => undefined, handlers, { measureTimeout: -1 })).toBeInstanceOf(Promise);
+  expect(
+    runMeasureLifecycle({
+      callback: () => undefined,
+      handlers,
+      measureOptions: { measureTimeout: -1 },
+    })
+  ).toBeInstanceOf(Promise);
 });
 
 test('invokes a callback', async () => {
   const cbMock = vi.fn();
 
-  await runMeasureLifecycle(cbMock, handlers, { warmupIterationCount: 0, measureTimeout: -1 });
+  await runMeasureLifecycle({
+    callback: cbMock,
+    handlers,
+    measureOptions: { warmupIterationCount: 0, measureTimeout: -1 },
+  });
 
   expect(cbMock).toHaveBeenCalledTimes(1);
 });
@@ -41,10 +51,14 @@ test('invokes a callback', async () => {
 test('invokes afterWarmup callback', async () => {
   const afterWarmupMock = vi.fn();
 
-  await runMeasureLifecycle(() => undefined, handlers, {
-    warmupIterationCount: 1,
-    measureTimeout: -1,
-    afterWarmup: afterWarmupMock,
+  await runMeasureLifecycle({
+    callback: () => undefined,
+    handlers,
+    measureOptions: {
+      warmupIterationCount: 1,
+      measureTimeout: -1,
+      afterWarmup: afterWarmupMock,
+    },
   });
 
   expect(afterWarmupMock).toHaveBeenCalledTimes(1);
@@ -56,18 +70,22 @@ test('respects warmupIterationCount', () => {
     const beforeIterationMock = vi.fn();
     const afterIterationMock = vi.fn();
 
-    runMeasureLifecycle(cbMock, handlers, {
-      warmupIterationCount: 10,
-      measureTimeout: -1,
+    runMeasureLifecycle({
+      callback: cbMock,
+      handlers,
+      measureOptions: {
+        warmupIterationCount: 10,
+        measureTimeout: -1,
 
-      afterWarmup() {
-        expect(cbMock).toHaveBeenCalledTimes(10);
-        expect(beforeIterationMock).toHaveBeenCalledTimes(10);
-        expect(afterIterationMock).toHaveBeenCalledTimes(10);
-        done();
+        afterWarmup() {
+          expect(cbMock).toHaveBeenCalledTimes(10);
+          expect(beforeIterationMock).toHaveBeenCalledTimes(10);
+          expect(afterIterationMock).toHaveBeenCalledTimes(10);
+          done();
+        },
+        beforeIteration: beforeIterationMock,
+        afterIteration: afterIterationMock,
       },
-      beforeIteration: beforeIterationMock,
-      afterIteration: afterIterationMock,
     });
   });
 });
@@ -75,29 +93,37 @@ test('respects warmupIterationCount', () => {
 test('does not invoke afterWarmup callback', async () => {
   const afterWarmupMock = vi.fn();
 
-  await runMeasureLifecycle(() => undefined, handlers, {
-    warmupIterationCount: 0,
-    measureTimeout: -1,
-    afterWarmup: afterWarmupMock,
+  await runMeasureLifecycle({
+    callback: () => undefined,
+    handlers,
+    measureOptions: {
+      warmupIterationCount: 0,
+      measureTimeout: -1,
+      afterWarmup: afterWarmupMock,
+    },
   });
 
   expect(afterWarmupMock).not.toHaveBeenCalled();
 });
 
 test('triggers onError', async () => {
-  await runMeasureLifecycle(
-    () => {
+  await runMeasureLifecycle({
+    callback: () => {
       throw new Error();
     },
     handlers,
-    { measureTimeout: -1 }
-  );
+    measureOptions: { measureTimeout: -1 },
+  });
 
   expect(handlers.onMeasureError).toHaveBeenCalled();
 });
 
 test('triggers onProgress', async () => {
-  await runMeasureLifecycle(() => undefined, handlers, { measureTimeout: -1 });
+  await runMeasureLifecycle({
+    callback: () => undefined,
+    handlers,
+    measureOptions: { measureTimeout: -1 },
+  });
 
   expect(handlers.onMeasureProgress).toHaveBeenCalledTimes(2);
   expect(handlers.onMeasureProgress).toHaveBeenNthCalledWith(1, 0);
@@ -110,15 +136,19 @@ test('runs measurements in batches', async () => {
   const beforeIterationMock = vi.fn();
   const afterIterationMock = vi.fn();
 
-  const { durationHistogram } = await runMeasureLifecycle(() => undefined, handlers, {
-    measureTimeout: 100,
-    warmupIterationCount: 0,
-    batchIntermissionTimeout: 0,
-    batchTimeout: 10,
-    beforeBatch: beforeBatchMock,
-    afterBatch: afterBatchMock,
-    beforeIteration: beforeIterationMock,
-    afterIteration: afterIterationMock,
+  const { durationHistogram } = await runMeasureLifecycle({
+    callback: () => undefined,
+    handlers,
+    measureOptions: {
+      measureTimeout: 100,
+      warmupIterationCount: 0,
+      batchIntermissionTimeout: 0,
+      batchTimeout: 10,
+      beforeBatch: beforeBatchMock,
+      afterBatch: afterBatchMock,
+      beforeIteration: beforeIterationMock,
+      afterIteration: afterIterationMock,
+    },
   });
 
   expect(durationHistogram.size).toBeGreaterThan(400);
@@ -139,16 +169,16 @@ test('runs measurements in batches', async () => {
 });
 
 test('captures errors in measured callback', async () => {
-  const { durationHistogram } = await runMeasureLifecycle(
-    () => {
+  const { durationHistogram } = await runMeasureLifecycle({
+    callback: () => {
       throw new Error();
     },
     handlers,
-    {
+    measureOptions: {
       measureTimeout: 10,
       warmupIterationCount: 0,
-    }
-  );
+    },
+  });
 
   expect(durationHistogram.size).toBeGreaterThan(50);
   expect(onMeasureErrorMock).toHaveBeenCalledTimes(durationHistogram.size);

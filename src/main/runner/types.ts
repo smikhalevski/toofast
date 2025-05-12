@@ -32,6 +32,8 @@ export interface MasterLifecycleHandlers {
  * Handles messages sent from the worker to the master.
  */
 export interface WorkerMessageHandlers {
+  onReady(message: ReadyMessage): void;
+
   onTestStartMessage(message: TestStartMessage): void;
 
   onTestEndMessage(message: TestEndMessage): void;
@@ -59,6 +61,7 @@ export interface MasterMessageHandlers {
 }
 
 export type WorkerMessage =
+  | ReadyMessage
   | TestStartMessage
   | TestEndMessage
   | TestFatalErrorMessage
@@ -73,10 +76,14 @@ export type MasterMessage = TestLifecycleInitMessage;
 
 export interface TestLifecycleInitMessage {
   type: 'testLifecycleInit';
-  filePath: string;
-  testPath: number[];
-  setupFilePaths: string[] | undefined;
+  file: string;
+  testLocation: number[];
+  setupFiles: string[];
   testOptions: TestOptions | undefined;
+}
+
+export interface ReadyMessage {
+  type: 'ready';
 }
 
 export interface TestStartMessage {

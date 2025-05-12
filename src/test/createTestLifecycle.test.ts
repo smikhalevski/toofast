@@ -24,7 +24,11 @@ beforeEach(() => {
 });
 
 test('runs the lifecycle', async () => {
-  const lifecycle = createTestLifecycle([1, 1, 1], runMeasureLifecycleMock, handlers);
+  const lifecycle = createTestLifecycle({
+    testLocation: [1, 1, 1],
+    runMeasureLifecycle: runMeasureLifecycleMock,
+    handlers,
+  });
 
   const r = lifecycle.runtime;
 
@@ -61,7 +65,7 @@ test('runs the lifecycle', async () => {
 });
 
 test('executes hooks', async () => {
-  const lifecycle = createTestLifecycle([0], runMeasureLifecycle, handlers);
+  const lifecycle = createTestLifecycle({ testLocation: [0], runMeasureLifecycle, handlers });
 
   const r = lifecycle.runtime;
 
@@ -97,7 +101,7 @@ test('executes hooks', async () => {
 });
 
 test('executes hooks defined in test', async () => {
-  const lifecycle = createTestLifecycle([0], runMeasureLifecycle, handlers);
+  const lifecycle = createTestLifecycle({ testLocation: [0], runMeasureLifecycle, handlers });
 
   const r = lifecycle.runtime;
 

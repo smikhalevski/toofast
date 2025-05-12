@@ -1,4 +1,4 @@
-import { Hook, SyncHook } from './types.js';
+import { Hook } from './types.js';
 
 export function noop() {}
 
@@ -6,17 +6,13 @@ export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export function callHooks(hooks: Hook[] | undefined): Promise<void> | undefined {
+export async function callHooks(hooks: Hook[] | undefined): Promise<void> {
   if (hooks === undefined) {
     return;
   }
-
-  let promise = Promise.resolve();
-
   for (const hook of hooks) {
-    promise = promise.then(hook);
+    await hook();
   }
-  return promise;
 }
 
 export function combineHooks(hooks: Hook[] | undefined, hook: Hook | undefined): Hook | undefined {
@@ -24,16 +20,4 @@ export function combineHooks(hooks: Hook[] | undefined, hook: Hook | undefined):
     return;
   }
   return () => Promise.resolve(callHooks(hooks)).then(hook);
-}
-
-export function combineSyncHooks(hooks: SyncHook[] | undefined, hook: SyncHook | undefined): SyncHook | undefined {
-  if (hooks === undefined) {
-    return hook;
-  }
-  return () => {
-    for (const hook of hooks) {
-      hook();
-    }
-    hook?.();
-  };
 }

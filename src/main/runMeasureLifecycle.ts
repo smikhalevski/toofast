@@ -2,25 +2,12 @@ import { Histogram } from './Histogram.js';
 import { MeasureOptions } from './types.js';
 import { sleep } from './utils.js';
 
-const DEFAULT_MEASURE_TIMEOUT = 10_000;
-const DEFAULT_TARGET_RME = 0.01;
-const DEFAULT_WARMUP_ITERATION_COUNT = 1;
-const DEFAULT_BATCH_ITERATION_COUNT = Infinity;
-const DEFAULT_BATCH_TIMEOUT = 1_000;
-const DEFAULT_BATCH_INTERMISSION_TIMEOUT = 200;
-
-export interface RunMeasureResult {
-  durationHistogram: Histogram;
-  memoryHistogram: Histogram;
-}
-
-export type RunMeasureLifecycle = (
-  cb: () => unknown,
-  handlers?: MeasureLifecycleHandlers,
-  options?: MeasureOptions,
-  durationHistogram?: Histogram,
-  memoryHistogram?: Histogram
-) => Promise<RunMeasureResult>;
+const MEASURE_TIMEOUT = 10_000;
+const TARGET_RME = 0.01;
+const WARMUP_ITERATION_COUNT = 1;
+const BATCH_ITERATION_COUNT = Infinity;
+const BATCH_TIMEOUT = 1_000;
+const BATCH_INTERMISSION_TIMEOUT = 200;
 
 export interface MeasureLifecycleHandlers {
   /**
@@ -60,67 +47,95 @@ export interface MeasureLifecycleHandlers {
   onMeasureProgress?(percent: number): void;
 }
 
+export interface MeasureLifecycleOptions {
+  /**
+   * The callback to measure performance of.
+   */
+  callback: () => unknown;
+
+  /**
+   * Callbacks that are invoked at different lifecycle phases.
+   */
+  handlers?: MeasureLifecycleHandlers;
+
+  /**
+   * Measurement options.
+   */
+  measureOptions?: MeasureOptions;
+
+  /**
+   * The histogram to store performance measurements.
+   */
+  durationHistogram?: Histogram;
+
+  /**
+   * The histogram to store memory usage measurements.
+   */
+  memoryHistogram?: Histogram;
+}
+
+/**
+ * Measurement results.
+ */
+export interface MeasureResult {
+  durationHistogram: Histogram;
+  memoryHistogram: Histogram;
+}
+
 /**
  * Measures callback performance and stores measurements in a histogram.
- *
- * @param cb The measured callback.
- * @param handlers Callbacks that are invoked at different lifecycle phases.
- * @param options Other measurement options.
- * @param durationHistogram The histogram to store performance measurements.
- * @param memoryHistogram
- * @returns The promise that is resolved with the results' histogram when measurements are completed.
  */
-export const runMeasureLifecycle: RunMeasureLifecycle = (
-  cb,
-  handlers = {},
-  options = {},
-  durationHistogram = new Histogram(),
-  memoryHistogram = new Histogram()
-) => {
+export async function runMeasureLifecycle(options: MeasureLifecycleOptions): Promise<MeasureResult> {
+  const {
+    callback,
+    handlers = {},
+    measureOptions = {},
+    durationHistogram = new Histogram(),
+    memoryHistogram = new Histogram(),
+  } = options;
+
   const { onMeasureStart, onMeasureEnd, onMeasureWarmupStart, onMeasureWarmupEnd, onMeasureError, onMeasureProgress } =
     handlers;
 
   const {
-    measureTimeout = DEFAULT_MEASURE_TIMEOUT,
-    targetRme = DEFAULT_TARGET_RME,
-    warmupIterationCount = DEFAULT_WARMUP_ITERATION_COUNT,
-    batchIterationCount = DEFAULT_BATCH_ITERATION_COUNT,
-    batchTimeout = DEFAULT_BATCH_TIMEOUT,
-    batchIntermissionTimeout = DEFAULT_BATCH_INTERMISSION_TIMEOUT,
+    measureTimeout = MEASURE_TIMEOUT,
+    targetRme = TARGET_RME,
+    warmupIterationCount = WARMUP_ITERATION_COUNT,
+    batchIterationCount = BATCH_ITERATION_COUNT,
+    batchTimeout = BATCH_TIMEOUT,
+    batchIntermissionTimeout = BATCH_INTERMISSION_TIMEOUT,
     afterWarmup,
     beforeBatch,
     afterBatch,
     beforeIteration,
     afterIteration,
-  } = options;
-
-  let lifecyclePromise = Promise.resolve();
+  } = measureOptions;
 
   // Warmup phase
   if (warmupIterationCount > 0) {
-    lifecyclePromise = lifecyclePromise
-      .then(() => {
-        onMeasureWarmupStart?.();
-        return beforeBatch?.();
-      })
-      .then(() => {
-        for (let i = 0; i < warmupIterationCount; ++i) {
-          beforeIteration?.();
-          try {
-            cb();
-          } catch (error) {
-            onMeasureError?.(error);
-          }
-          afterIteration?.();
-        }
+    onMeasureWarmupStart?.();
 
-        return afterBatch?.();
-      })
-      .then(afterWarmup)
-      .then(() => {
-        onMeasureWarmupEnd?.();
-        return sleep(batchIntermissionTimeout);
-      });
+    await beforeBatch?.();
+
+    for (let i = 0; i < warmupIterationCount; ++i) {
+      await beforeIteration?.();
+
+      try {
+        callback();
+      } catch (error) {
+        onMeasureError?.(error);
+      }
+
+      await afterIteration?.();
+    }
+
+    await afterBatch?.();
+
+    await afterWarmup?.();
+
+    onMeasureWarmupEnd?.();
+
+    await sleep(batchIntermissionTimeout);
   }
 
   let totalIterationCount = 0;
@@ -128,7 +143,7 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
 
   const measureTimestamp = Date.now();
 
-  const nextBatch = (): Promise<void> | void => {
+  const nextBatch = async (): Promise<void> => {
     const batchTimestamp = Date.now();
 
     let iterationCount = 0;
@@ -137,13 +152,13 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
       ++iterationCount;
       ++totalIterationCount;
 
-      beforeIteration?.();
+      await beforeIteration?.();
 
       const memoryUsed = getMemoryUsed();
       const iterationTimestamp = performance.now();
 
       try {
-        cb();
+        callback();
       } catch (error) {
         onMeasureError?.(error);
       }
@@ -155,16 +170,17 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
         memoryHistogram.add(memoryUsedDelta);
       }
 
-      afterIteration?.();
+      await afterIteration?.();
 
       const measureDuration = Date.now() - measureTimestamp;
-      const rme = durationHistogram.rme;
+      const { rme } = durationHistogram;
 
       if (measureDuration > measureTimeout || (totalIterationCount > 2 && targetRme >= rme)) {
         onMeasureProgress?.(1);
 
         // Measurements completed
-        return Promise.resolve(afterBatch?.());
+        await afterBatch?.();
+        return;
       }
 
       progress = Math.max(
@@ -177,26 +193,30 @@ export const runMeasureLifecycle: RunMeasureLifecycle = (
 
       if (Date.now() - batchTimestamp > batchTimeout || iterationCount >= batchIterationCount) {
         // Schedule the next measurement batch
+        await afterBatch?.();
+
         // The pause between batches is required for garbage collection
-        return Promise.resolve()
-          .then(afterBatch)
-          .then(() => sleep(batchIntermissionTimeout))
-          .then(beforeBatch)
-          .then(nextBatch);
+        await sleep(batchIntermissionTimeout);
+
+        await beforeBatch?.();
+
+        return nextBatch();
       }
     }
   };
 
-  return lifecyclePromise
-    .then(onMeasureStart)
-    .then(beforeBatch)
-    .then(() => onMeasureProgress?.(0))
-    .then(nextBatch)
-    .then(() => {
-      onMeasureEnd?.(durationHistogram);
-      return { durationHistogram, memoryHistogram };
-    });
-};
+  onMeasureStart?.();
+
+  await beforeBatch?.();
+
+  onMeasureProgress?.(0);
+
+  await nextBatch();
+
+  onMeasureEnd?.(durationHistogram);
+
+  return { durationHistogram, memoryHistogram };
+}
 
 function getMemoryUsed(): number {
   return typeof process !== 'undefined' ? process.memoryUsage().heapUsed : 0;

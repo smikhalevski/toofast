@@ -1,9 +1,35 @@
-export * from './Adder.js';
-export * from './Histogram.js';
-export * from './createTestSuiteLifecycle.js';
-export * from './createTestLifecycle.js';
-export * from './runMeasureLifecycle.js';
-export * from './types.js';
-export { combineSyncHooks } from './utils.js';
-export { combineHooks } from './utils.js';
-export { callHooks } from './utils.js';
+export { Adder } from './Adder.js';
+export { Histogram, type HistogramStats } from './Histogram.js';
+export {
+  createTestSuiteLifecycle,
+  type TestNode,
+  type DescribeNode,
+  type TestSuiteLifecycle,
+  type TestSuiteLifecycleHandlers,
+  type TestSuiteLifecycleOptions,
+  type TestSuiteNode,
+} from './createTestSuiteLifecycle.js';
+export {
+  createTestLifecycle,
+  type TestLifecycle,
+  type TestLifecycleHandlers,
+  type TestLifecycleOptions,
+} from './createTestLifecycle.js';
+export {
+  runMeasureLifecycle,
+  type MeasureResult,
+  type MeasureLifecycleOptions,
+  type MeasureLifecycleHandlers,
+} from './runMeasureLifecycle.js';
+export {
+  type Hook,
+  type RegisterHook,
+  type Describe,
+  type Test,
+  type TestCallback,
+  type Measure,
+  type TestOptions,
+  type MeasureOptions,
+  type Runtime,
+} from './types.js';
+export { combineHooks, callHooks } from './utils.js';

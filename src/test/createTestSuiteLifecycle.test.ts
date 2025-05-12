@@ -7,7 +7,7 @@ import {
   TestSuiteNode,
 } from '../main/index.js';
 
-const testLifecycleMock = vi.fn(() => Promise.resolve());
+const runTestLifecycleMock = vi.fn(() => Promise.resolve());
 
 const onDescribeStartMock = vi.fn();
 const onDescribeEndMock = vi.fn();
@@ -18,14 +18,14 @@ const handlers: TestSuiteLifecycleHandlers = {
 };
 
 beforeEach(() => {
-  testLifecycleMock.mockClear();
+  runTestLifecycleMock.mockClear();
 
   onDescribeStartMock.mockClear();
   onDescribeEndMock.mockClear();
 });
 
 test('assembles nodes', () => {
-  const lifecycle = createTestSuiteLifecycle(testLifecycleMock, handlers);
+  const lifecycle = createTestSuiteLifecycle({ runTestLifecycle: runTestLifecycleMock, handlers });
 
   const r = lifecycle.runtime;
 
@@ -124,7 +124,7 @@ test('assembles nodes', () => {
 });
 
 test('runs the lifecycle', async () => {
-  const lifecycle = createTestSuiteLifecycle(testLifecycleMock, handlers);
+  const lifecycle = createTestSuiteLifecycle({ runTestLifecycle: runTestLifecycleMock, handlers });
 
   const r = lifecycle.runtime;
 
@@ -135,9 +135,9 @@ test('runs the lifecycle', async () => {
 
   await lifecycle.run();
 
-  expect(testLifecycleMock).toHaveBeenCalledTimes(2);
-  expect(testLifecycleMock).toHaveBeenNthCalledWith(1, (lifecycle.node.children[0] as DescribeNode).children[0]);
-  expect(testLifecycleMock).toHaveBeenNthCalledWith(2, lifecycle.node.children[1]);
+  expect(runTestLifecycleMock).toHaveBeenCalledTimes(2);
+  expect(runTestLifecycleMock).toHaveBeenNthCalledWith(1, (lifecycle.node.children[0] as DescribeNode).children[0]);
+  expect(runTestLifecycleMock).toHaveBeenNthCalledWith(2, lifecycle.node.children[1]);
 
   expect(onDescribeStartMock).toHaveBeenCalledTimes(1);
   expect(onDescribeEndMock).toHaveBeenCalledTimes(1);

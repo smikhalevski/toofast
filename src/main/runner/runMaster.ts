@@ -1,6 +1,6 @@
 import { createTestSuiteLifecycle, TestNode } from '../createTestSuiteLifecycle.js';
-import { MasterLifecycleHandlers, MasterMessage, WorkerMessage } from './types.js';
-import { getTestPath, handleWorkerMessage } from './utils.js';
+import { MasterLifecycleHandlers, MasterMessage, ReadyMessage } from './types.js';
+import { getTestLocation, handleWorkerMessage } from './utils.js';
 import { Runtime, TestOptions } from '../types.js';
 
 export interface WorkerOptions {
@@ -14,106 +14,98 @@ export interface Worker {
 }
 
 export interface RunMasterOptions {
-  setupFilePaths: string[] | undefined;
-  includeFilePaths: string[];
+  setupFiles: string[] | undefined;
+  includeFiles: string[];
   testNamePatterns: RegExp[] | undefined;
   testOptions: TestOptions | undefined;
   handlers: MasterLifecycleHandlers;
-  loadFile: (filePath: string) => Promise<void> | void;
-  loadRuntime: (runtime: Runtime) => Promise<void> | void;
+  importFile: (file: string) => Promise<void> | void;
+  injectRuntime: (file: string, runtime: Runtime) => Promise<void> | void;
   startWorker: (options: WorkerOptions) => Worker;
   tearDown: () => void;
 }
 
-export function runMaster(options: RunMasterOptions): void {
+export async function runMaster(options: RunMasterOptions): Promise<void> {
   const {
-    setupFilePaths,
-    includeFilePaths,
+    setupFiles = [],
+    includeFiles,
     testNamePatterns,
     testOptions,
     handlers,
-    loadFile,
-    loadRuntime,
+    importFile,
+    injectRuntime,
     startWorker,
     tearDown,
   } = options;
 
-  let testNode: TestNode;
-
-  const handleMessage = (message: WorkerMessage) => {
-    handleWorkerMessage(message, {
-      onTestStartMessage() {
-        handlers.onTestStart(testNode);
-      },
-      onTestEndMessage(message) {
-        handlers.onTestEnd(testNode, message.durationStats, message.memoryStats);
-      },
-      onTestFatalErrorMessage(message) {
-        handlers.onTestFatalError(testNode, message.message);
-      },
-      onMeasureWarmupStartMessage() {
-        handlers.onMeasureWarmupStart(testNode);
-      },
-      onMeasureWarmupEndMessage() {
-        handlers.onMeasureWarmupEnd(testNode);
-      },
-      onMeasureStartMessage() {
-        handlers.onMeasureStart(testNode);
-      },
-      onMeasureEndMessage(message) {
-        handlers.onMeasureEnd(testNode, message.stats);
-      },
-      onMeasureErrorMessage(message) {
-        handlers.onMeasureError(testNode, message.errorMessage);
-      },
-      onMeasureProgressMessage(message) {
-        handlers.onMeasureProgress(testNode, message.percent);
-      },
-    });
-  };
-
-  let testSuitePromise = Promise.resolve();
-
-  includeFilePaths.forEach(filePath => {
-    testSuitePromise = testSuitePromise.then(() => {
-      const runTestLifecycle = (node: TestNode) =>
-        new Promise<void>(resolve => {
-          testNode = node;
-
-          const worker = startWorker({
-            onMessage: handleMessage,
-            onError(error) {
-              handlers.onTestFatalError(testNode, error);
-            },
-            onExit: resolve,
-          });
-
-          worker.postMessage({
-            type: 'testLifecycleInit',
-            filePath,
-            testPath: getTestPath(node),
-            setupFilePaths,
-            testOptions,
-          });
+  for (const file of includeFiles) {
+    const runTestLifecycle = (node: TestNode): Promise<void> => {
+      return new Promise(resolve => {
+        const worker = startWorker({
+          onMessage(message) {
+            handleWorkerMessage(message, {
+              onReady(_message: ReadyMessage) {
+                worker.postMessage({
+                  type: 'testLifecycleInit',
+                  file,
+                  testLocation: getTestLocation(node),
+                  setupFiles,
+                  testOptions,
+                });
+              },
+              onTestStartMessage() {
+                handlers.onTestStart(node);
+              },
+              onTestEndMessage(message) {
+                handlers.onTestEnd(node, message.durationStats, message.memoryStats);
+              },
+              onTestFatalErrorMessage(message) {
+                handlers.onTestFatalError(node, message.message);
+              },
+              onMeasureWarmupStartMessage() {
+                handlers.onMeasureWarmupStart(node);
+              },
+              onMeasureWarmupEndMessage() {
+                handlers.onMeasureWarmupEnd(node);
+              },
+              onMeasureStartMessage() {
+                handlers.onMeasureStart(node);
+              },
+              onMeasureEndMessage(message) {
+                handlers.onMeasureEnd(node, message.stats);
+              },
+              onMeasureErrorMessage(message) {
+                handlers.onMeasureError(node, message.errorMessage);
+              },
+              onMeasureProgressMessage(message) {
+                handlers.onMeasureProgress(node, message.percent);
+              },
+            });
+          },
+          onError(error) {
+            handlers.onTestFatalError(node, error);
+          },
+          onExit: resolve,
         });
-
-      const lifecycle = createTestSuiteLifecycle(runTestLifecycle, handlers, { testNamePatterns });
-
-      // Load runtime
-      let lifecyclePromise = new Promise(resolve => resolve(loadRuntime(lifecycle.runtime)));
-
-      // Load setup files
-      setupFilePaths?.forEach(filePath => {
-        lifecyclePromise = lifecyclePromise.then(() => loadFile(filePath));
       });
+    };
 
-      // Load and run the test suite
-      return lifecyclePromise
-        .then(() => loadFile(filePath))
-        .then(() => lifecycle.run())
-        .catch(error => handlers.onTestSuiteError(lifecycle.node, error));
-    });
-  });
+    const lifecycle = createTestSuiteLifecycle({ runTestLifecycle, handlers, testNamePatterns });
 
-  testSuitePromise.then(tearDown);
+    try {
+      await injectRuntime(file, lifecycle.runtime);
+
+      for (const file of setupFiles) {
+        await importFile(file);
+      }
+
+      await importFile(file);
+
+      await lifecycle.run();
+    } catch (error) {
+      handlers.onTestSuiteError(lifecycle.node, error);
+    }
+  }
+
+  tearDown();
 }
