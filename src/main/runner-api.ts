@@ -30,8 +30,8 @@ export class Node {
   callback: () => PromiseLike<void> | void;
 
   constructor(
-    public testOptions: TestOptions = {},
-    callback: () => PromiseLike<void> | void
+    callback: () => PromiseLike<void> | void,
+    public testOptions: TestOptions = {}
   ) {
     this.callback = () => {
       const value = callback();
@@ -97,7 +97,7 @@ export class Node {
 
 export class TestSuiteNode extends Node {
   constructor(testOptions: TestOptions = {}) {
-    super(testOptions, noop);
+    super(noop, testOptions);
   }
 }
 
@@ -107,7 +107,7 @@ export class DescribeNode extends Node {
     callback: () => PromiseLike<void> | void,
     testOptions: TestOptions = {}
   ) {
-    super(testOptions, callback);
+    super(callback, testOptions);
   }
 }
 
@@ -117,7 +117,7 @@ export class TestNode extends Node {
     callback: () => PromiseLike<void> | void,
     testOptions: TestOptions = {}
   ) {
-    super(testOptions, callback);
+    super(callback, testOptions);
   }
 
   get absoluteName(): string {
@@ -133,7 +133,7 @@ export class TestNode extends Node {
 
 export class MeasureNode extends Node {
   constructor(callback: () => void, measureOptions: MeasureOptions = {}) {
-    super(measureOptions, callback);
+    super(callback, measureOptions);
 
     this.afterWarmupHook = measureOptions.afterWarmup;
     this.beforeBatchHook = measureOptions.beforeBatch;
@@ -144,8 +144,9 @@ export class MeasureNode extends Node {
 }
 
 export type RunnerMessage =
-  | { type: 'noTests' }
   | { type: 'fatalError'; errorMessage: string }
+  | { type: 'testSuiteStart' }
+  | { type: 'testSuiteEnd' }
   | { type: 'describeStart'; name: string }
   | { type: 'describeEnd' }
   | { type: 'testStart'; name: string; nodeLocation: number[] }
@@ -221,6 +222,10 @@ export async function runTest(options: RunTestOptions): Promise<void> {
   if (nodeLocation.length !== 0) {
     depth = nodeLocation.length - 1;
     startIndex = nodeLocation[depth] + 1;
+  }
+
+  if (node instanceof TestSuiteNode) {
+    sendMessage({ type: 'testSuiteStart' });
   }
 
   traversal: while (true) {
@@ -309,7 +314,7 @@ export async function runTest(options: RunTestOptions): Promise<void> {
     break;
   }
 
-  sendMessage({ type: 'noTests' });
+  sendMessage({ type: 'testSuiteEnd' });
 }
 
 export interface RunMeasureOptions {

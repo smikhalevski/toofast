@@ -39,7 +39,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
         break;
 
       case 'testStart':
-        testName = message.name; //.padEnd(getNameLength(node));
+        testName = message.name; //.padEnd(message.maxPeerNameLength);
         measureCount = 0;
 
         clearLine();

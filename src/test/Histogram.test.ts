@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Histogram } from '../main/index.js';
+import { Histogram } from '../main/Histogram.js';
 
 test('creates a blank histogram', () => {
   const histogram = new Histogram();

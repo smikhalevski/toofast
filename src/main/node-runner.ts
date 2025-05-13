@@ -1,4 +1,5 @@
 import cluster from 'cluster';
+import childProcess from 'child_process';
 import {
   bootstrapRunner,
   createRunMeasure,
@@ -11,6 +12,7 @@ import { TestOptions } from './index.js';
 import { getErrorMessage } from './utils.js';
 import { createNodeLogger } from './createNodeLogger.js';
 import { resolveConfig } from './resolveConfig.js';
+import path from 'path';
 
 export default async function start(): Promise<void> {
   if (cluster.isWorker) {
@@ -18,13 +20,29 @@ export default async function start(): Promise<void> {
     return;
   }
 
-  const { setupFiles, testFiles, testRegExps, testOptions } = resolveConfig();
+  const config = resolveConfig();
 
-  const testPatterns = testRegExps.map(re => re.source);
+  // Restart process and enable TypeScript support
+  if (
+    (config.setupFiles.some(isTypeScriptFile) || config.testFiles.some(isTypeScriptFile)) &&
+    !process.execArgv.includes('--experimental-strip-types')
+  ) {
+    const [, filePath, ...args] = process.argv;
+
+    childProcess
+      .fork(filePath, args, {
+        execArgv: [...process.execArgv, '--experimental-strip-types', '--no-warnings=ExperimentalWarning'],
+      })
+      .once('close', exitCode => process.exit(exitCode));
+
+    return;
+  }
+
+  const testPatterns = config.testRegExps.map(re => re.source);
 
   const logger = createNodeLogger();
 
-  for (const testFile of testFiles) {
+  for (const testFile of config.testFiles) {
     let nodeLocation: number[] = [];
 
     const nextTest = (): Promise<void> => {
@@ -35,11 +53,11 @@ export default async function start(): Promise<void> {
           if (message.type === 'workerReady') {
             worker.send({
               type: 'runTest',
-              setupFiles,
+              setupFiles: config.setupFiles,
               testFile,
               nodeLocation,
               testPatterns,
-              testOptions,
+              testOptions: config.testOptions,
             } satisfies MasterMessage);
 
             return;
@@ -56,7 +74,7 @@ export default async function start(): Promise<void> {
           if (message.type === 'testEnd') {
             resolve(nextTest());
           }
-          if (message.type === 'noTests') {
+          if (message.type === 'testSuiteEnd') {
             resolve();
           }
         });
@@ -78,12 +96,10 @@ export default async function start(): Promise<void> {
 }
 
 function startWorker(): void {
-  const messageListener = async (message: MasterMessage) => {
+  process.once('message', async (message: MasterMessage) => {
     if (message.type !== 'runTest') {
       return;
     }
-
-    process.off('message', messageListener);
 
     const { setupFiles, testFile, nodeLocation, testPatterns } = message;
 
@@ -124,9 +140,7 @@ function startWorker(): void {
     });
 
     cluster.worker!.kill();
-  };
-
-  process.on('message', messageListener);
+  });
 
   sendMessage({ type: 'workerReady' });
 }
@@ -148,4 +162,10 @@ function evalFile(file: string): Promise<void> {
 
 function sendMessage(message: WorkerMessage): void {
   process.send!(message);
+}
+
+function isTypeScriptFile(file: string): boolean {
+  const ext = path.extname(file);
+
+  return ext === '.ts' || ext === '.mts' || ext === '.tsx' || ext === '.mtsx';
 }

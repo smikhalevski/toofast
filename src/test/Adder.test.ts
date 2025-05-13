@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Adder } from '../main/index.js';
+import { Adder } from '../main/Adder.js';
 
 test('reduces the error', () => {
   const adder = new Adder();

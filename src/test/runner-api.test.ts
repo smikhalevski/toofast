@@ -10,11 +10,12 @@ import {
   TestNode,
   TestSuiteNode,
 } from '../main/runner-api.js';
+import { noop } from '../main/utils.js';
 
 describe('Node', () => {
   test('creates a new node', () => {
     const testOptions = {};
-    const node = new Node(testOptions);
+    const node = new Node(noop, testOptions);
 
     expect(node.testOptions).toBe(testOptions);
     expect(node.parent).toBeNull();
@@ -34,7 +35,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.beforeEach(aMock);
 
@@ -52,7 +53,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.afterEach(aMock);
 
@@ -70,7 +71,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.beforeWarmup(aMock);
 
@@ -88,7 +89,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.afterWarmup(aMock);
 
@@ -106,7 +107,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.beforeBatch(aMock);
 
@@ -124,7 +125,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.afterBatch(aMock);
 
@@ -142,7 +143,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.beforeIteration(aMock);
 
@@ -160,7 +161,7 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const node = new Node();
+    const node = new Node(noop);
 
     node.afterIteration(aMock);
 
@@ -184,8 +185,8 @@ describe('Node', () => {
     const beforeIterationHookMock = vi.fn();
     const afterIterationHookMock = vi.fn();
 
-    const aNode = new Node({ batchTimeout: 111, targetRme: 222 });
-    const bNode = new Node({ targetRme: 333 });
+    const aNode = new Node(noop, { batchTimeout: 111, targetRme: 222 });
+    const bNode = new Node(noop, { targetRme: 333 });
 
     aNode.beforeEach(beforeEachHookMock);
     aNode.afterEach(afterEachHookMock);
@@ -215,8 +216,8 @@ describe('Node', () => {
     const aMock = vi.fn();
     const bMock = vi.fn();
 
-    const aNode = new Node();
-    const bNode = new Node();
+    const aNode = new Node(noop);
+    const bNode = new Node(noop);
 
     aNode.beforeEach(aMock);
     bNode.beforeEach(bMock);
@@ -230,8 +231,8 @@ describe('Node', () => {
   });
 
   test('cannot append child if it already has a parent', () => {
-    const aNode = new Node();
-    const bNode = new Node();
+    const aNode = new Node(noop);
+    const bNode = new Node(noop);
 
     aNode.appendChild(bNode as ChildNode);
     expect(() => aNode.appendChild(bNode as ChildNode)).toThrow(new Error('Child already has a parent'));
@@ -350,17 +351,20 @@ describe('runTest', () => {
 
     expect(runMeasureMock).toHaveBeenCalledTimes(1);
 
-    expect(sendMessageMock).toHaveBeenCalledTimes(3);
+    expect(sendMessageMock).toHaveBeenCalledTimes(4);
     expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
+      type: 'testSuiteStart',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
       type: 'describeStart',
       name: 'describe1',
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
       type: 'testStart',
       name: 'test11',
       nodeLocation: [0, 0],
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
       type: 'testEnd',
       durationStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
       memoryStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
@@ -430,6 +434,30 @@ describe('runTest', () => {
       type: 'testEnd',
       durationStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
       memoryStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
+    } satisfies RunnerMessage);
+  });
+
+  test('sends testSuiteEnd', async () => {
+    await runTest({
+      startNode: testSuiteNode,
+      nodeLocation: [1, 2],
+      isSkipped: () => false,
+      setCurrentNode: setCurrentNodeMock,
+      runMeasure: runMeasureMock,
+      sendMessage: sendMessageMock,
+    });
+
+    expect(setCurrentNodeMock).toHaveBeenCalledTimes(1);
+    expect(setCurrentNodeMock).toHaveBeenNthCalledWith(1, describe2Node);
+
+    expect(runMeasureMock).toHaveBeenCalledTimes(0);
+
+    expect(sendMessageMock).toHaveBeenCalledTimes(2);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
+      type: 'describeEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+      type: 'testSuiteEnd',
     } satisfies RunnerMessage);
   });
 });
