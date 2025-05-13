@@ -5,7 +5,7 @@ import { RunnerMessage } from './runner-api.js';
 const MESSAGE_PADDING = '  ';
 const MESSAGE_PENDING = dim('○ ');
 const MESSAGE_PENDING_ERROR = red('○ ');
-const MESSAGE_WARMUP = yellow('○ ');
+const MESSAGE_WARMUP = yellow('● ');
 const MESSAGE_ERROR = red('● ');
 const MESSAGE_SUCCESS = green('● ');
 const NEW_LINE = '\n';
@@ -15,45 +15,46 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
   let testName: string;
   let errorMessage: string | undefined;
   let measureCount = 0;
+  let hasMargin = false;
 
   return message => {
     switch (message.type) {
       case 'fatalError':
-        print(NEW_LINE + NEW_LINE + red(message.errorMessage));
+        print(NEW_LINE + red(message.errorMessage) + NEW_LINE);
         break;
 
       case 'describeStart':
-        // if (node.parent.type !== 'testSuite' || node.parent.children[0] !== node) {
-        //   print(NEW_LINE);
-        // }
-        print(MESSAGE_PADDING.repeat(depth) + bold(message.name) + NEW_LINE);
+        print(NEW_LINE + MESSAGE_PADDING.repeat(depth) + bold(message.name) + NEW_LINE);
+
+        hasMargin = false;
         ++depth;
         break;
 
       case 'describeEnd':
+        if (errorMessage !== undefined) {
+          print(red(errorMessage));
+        }
+        hasMargin = true;
         --depth;
         break;
 
       case 'testStart':
-        // if (errorMessage !== undefined) {
-        //   print(NEW_LINE + NEW_LINE);
-        // } else if (node.parent.children[node.parent.children.indexOf(node) - 1]?.type === 'describe') {
-        print(NEW_LINE);
-        // }
-
         testName = message.name; //.padEnd(getNameLength(node));
         measureCount = 0;
-        errorMessage = undefined;
 
         clearLine();
-        print(MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING + testName + MESSAGE_PADDING);
+        print(
+          (hasMargin ? NEW_LINE : '') + MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING + testName + MESSAGE_PADDING
+        );
+
+        hasMargin = false;
         break;
 
       case 'testEnd':
         clearLine();
         print(
           MESSAGE_PADDING.repeat(depth) +
-            (errorMessage ? MESSAGE_ERROR : MESSAGE_SUCCESS) +
+            (errorMessage !== undefined ? MESSAGE_ERROR : MESSAGE_SUCCESS) +
             testName +
             MESSAGE_PADDING +
             formatMeasurement(message.durationStats.hz, 'Hz') +
@@ -62,15 +63,14 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
             formatMeasurement(message.memoryStats.mean, 'B') +
             formatRme(message.memoryStats.rme) +
             NEW_LINE +
-            (errorMessage ? red(errorMessage) : '')
+            (errorMessage !== undefined ? red(errorMessage) + NEW_LINE : '')
         );
+        hasMargin = errorMessage !== undefined;
+        errorMessage = undefined;
         break;
 
       case 'error':
         errorMessage = message.errorMessage;
-        clearLine();
-        print(MESSAGE_PADDING.repeat(depth) + MESSAGE_ERROR + testName + NEW_LINE + red(errorMessage));
-
         break;
 
       case 'measureWarmupStart':
@@ -105,7 +105,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
         clearLine();
         print(
           MESSAGE_PADDING.repeat(depth) +
-            (errorMessage ? MESSAGE_PENDING_ERROR : MESSAGE_PENDING) +
+            (errorMessage !== undefined ? MESSAGE_PENDING_ERROR : MESSAGE_PENDING) +
             testName +
             MESSAGE_PADDING +
             formatMeasureCount(measureCount) +

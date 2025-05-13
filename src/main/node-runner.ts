@@ -18,13 +18,13 @@ export default async function start(): Promise<void> {
     return;
   }
 
-  const { setupFilePaths, testFilePaths, testRegExps, testOptions } = resolveConfig();
+  const { setupFiles, testFiles, testRegExps, testOptions } = resolveConfig();
 
   const testPatterns = testRegExps.map(re => re.source);
 
   const logger = createNodeLogger();
 
-  for (const testFilePath of testFilePaths) {
+  for (const testFile of testFiles) {
     let nodeLocation: number[] = [];
 
     const nextTest = (): Promise<void> => {
@@ -35,12 +35,13 @@ export default async function start(): Promise<void> {
           if (message.type === 'workerReady') {
             worker.send({
               type: 'runTest',
-              setupFilePaths: setupFilePaths,
-              testFilePath,
+              setupFiles,
+              testFile,
               nodeLocation,
               testPatterns,
               testOptions,
             } satisfies MasterMessage);
+
             return;
           }
 
@@ -65,11 +66,15 @@ export default async function start(): Promise<void> {
 
           process.exit(1);
         });
+
+        worker.on('exit', resolve);
       });
     };
 
     await nextTest();
   }
+
+  process.exit(0);
 }
 
 function startWorker(): void {
@@ -80,7 +85,7 @@ function startWorker(): void {
 
     process.off('message', messageListener);
 
-    const { setupFilePaths, testFilePath, nodeLocation, testPatterns } = message;
+    const { setupFiles, testFile, nodeLocation, testPatterns } = message;
 
     const testRegExps = testPatterns.map(pattern => RegExp(pattern, 'i'));
 
@@ -88,15 +93,16 @@ function startWorker(): void {
 
     setCurrentNode(testSuiteNode);
 
-    const isOK = await bootstrapRunner({
-      setupFilePaths,
-      testFilePath,
+    const isSuccessful = await bootstrapRunner({
+      setupFiles,
+      testFile,
       evalFile,
       sendMessage,
     });
 
-    if (!isOK) {
-      process.exit(0);
+    if (!isSuccessful) {
+      cluster.worker!.kill();
+      return;
     }
 
     const runMeasure = createRunMeasure({
@@ -117,18 +123,18 @@ function startWorker(): void {
       sendMessage,
     });
 
-    process.exit(0);
+    cluster.worker!.kill();
   };
 
   process.on('message', messageListener);
 
-  setTimeout(() => sendMessage({ type: 'workerReady' }), 100);
+  sendMessage({ type: 'workerReady' });
 }
 
 type MasterMessage = {
   type: 'runTest';
-  setupFilePaths: string[];
-  testFilePath: string;
+  setupFiles: string[];
+  testFile: string;
   nodeLocation: number[];
   testPatterns: string[];
   testOptions: TestOptions;
@@ -136,8 +142,8 @@ type MasterMessage = {
 
 type WorkerMessage = { type: 'workerReady' } | RunnerMessage;
 
-function evalFile(filePath: string): Promise<void> {
-  return import(filePath);
+function evalFile(file: string): Promise<void> {
+  return import(file);
 }
 
 function sendMessage(message: WorkerMessage): void {

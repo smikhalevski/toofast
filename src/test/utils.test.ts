@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { combineHooks } from '../../main/___/utils.js';
+import { combineHooks } from '../main/utils.js';
 
 describe('combineHooks', () => {
   const aMock = vi.fn();

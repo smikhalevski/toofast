@@ -1,0 +1,6 @@
+{
+  "testOptions": {
+    "measureTimeout": 1000
+  },
+  "include": ["./example.perf.js"]
+}

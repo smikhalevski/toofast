@@ -1,23 +1,21 @@
-import { Hook } from './types.js';
+import { HookCallback } from './index.js';
 
-export function noop() {}
+export function noop(): void {}
+
+export function getErrorMessage(error: any): string {
+  return error instanceof Error ? error.stack || error.message : String(error);
+}
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export async function callHooks(hooks: Hook[] | undefined): Promise<void> {
-  if (hooks === undefined) {
-    return;
+export function combineHooks(a: HookCallback | undefined, b: HookCallback | undefined): HookCallback | undefined {
+  if (a === undefined || b === undefined) {
+    return a || b;
   }
-  for (const hook of hooks) {
-    await hook();
-  }
-}
-
-export function combineHooks(hooks: Hook[] | undefined, hook: Hook | undefined): Hook | undefined {
-  if (hooks === undefined && hook === undefined) {
-    return;
-  }
-  return () => Promise.resolve(callHooks(hooks)).then(hook);
+  return async () => {
+    await a();
+    await b();
+  };
 }

@@ -1,9 +1,9 @@
 import { HookCallback, MeasureOptions, TestOptions } from './index.js';
-import { combineHooks, getErrorMessage, sleep } from './utils.js';
+import { combineHooks, getErrorMessage, noop, sleep } from './utils.js';
 import { Histogram, HistogramStats } from './Histogram.js';
 
 const MEASURE_TIMEOUT = 10_000;
-const TARGET_RME = 0.01;
+const TARGET_RME = 0.05;
 const WARMUP_ITERATION_COUNT = 1;
 const BATCH_ITERATION_COUNT = Infinity;
 const BATCH_TIMEOUT = 1_000;
@@ -27,7 +27,18 @@ export class Node {
   beforeIterationHook: HookCallback | undefined = undefined;
   afterIterationHook: HookCallback | undefined = undefined;
 
-  constructor(public testOptions: TestOptions) {}
+  callback: () => PromiseLike<void> | void;
+
+  constructor(
+    public testOptions: TestOptions = {},
+    callback: () => PromiseLike<void> | void
+  ) {
+    this.callback = () => {
+      const value = callback();
+      this.callback = noop;
+      return value;
+    };
+  }
 
   beforeEach(hook: HookCallback): void {
     this.beforeEachHook = combineHooks(this.beforeEachHook, hook);
@@ -84,25 +95,29 @@ export class Node {
   }
 }
 
-export class TestSuiteNode extends Node {}
+export class TestSuiteNode extends Node {
+  constructor(testOptions: TestOptions = {}) {
+    super(testOptions, noop);
+  }
+}
 
 export class DescribeNode extends Node {
   constructor(
     readonly name: string,
-    readonly callback: () => PromiseLike<void> | void,
+    callback: () => PromiseLike<void> | void,
     testOptions: TestOptions = {}
   ) {
-    super(testOptions);
+    super(testOptions, callback);
   }
 }
 
 export class TestNode extends Node {
   constructor(
     readonly name: string,
-    readonly callback: () => PromiseLike<void> | void,
+    callback: () => PromiseLike<void> | void,
     testOptions: TestOptions = {}
   ) {
-    super(testOptions);
+    super(testOptions, callback);
   }
 
   get absoluteName(): string {
@@ -117,11 +132,8 @@ export class TestNode extends Node {
 }
 
 export class MeasureNode extends Node {
-  constructor(
-    readonly callback: () => void,
-    measureOptions: MeasureOptions = {}
-  ) {
-    super(measureOptions);
+  constructor(callback: () => void, measureOptions: MeasureOptions = {}) {
+    super(measureOptions, callback);
 
     this.afterWarmupHook = measureOptions.afterWarmup;
     this.beforeBatchHook = measureOptions.beforeBatch;
@@ -147,23 +159,23 @@ export type RunnerMessage =
   | { type: 'measureProgress'; percentage: number };
 
 export interface BootstrapRunnerOptions {
-  setupFilePaths: string[];
-  testFilePath: string;
+  setupFiles: string[];
+  testFile: string;
 
-  evalFile(filePath: string): Promise<void> | void;
+  evalFile(file: string): Promise<void> | void;
 
   sendMessage(message: RunnerMessage): void;
 }
 
 export async function bootstrapRunner(options: BootstrapRunnerOptions): Promise<boolean> {
-  const { setupFilePaths, testFilePath, evalFile, sendMessage } = options;
+  const { setupFiles, testFile, evalFile, sendMessage } = options;
 
   try {
-    for (const filePath of setupFilePaths) {
-      await evalFile(filePath);
+    for (const file of setupFiles) {
+      await evalFile(file);
     }
 
-    evalFile(testFilePath);
+    await evalFile(testFile);
   } catch (error) {
     sendMessage({ type: 'fatalError', errorMessage: getErrorMessage(error) });
     return false;
@@ -197,7 +209,7 @@ export async function runTest(options: RunTestOptions): Promise<void> {
 
   const nodeLocation = options.nodeLocation.splice(0);
 
-  for (const index of nodeLocation.splice(0, -1)) {
+  for (const index of nodeLocation.slice(0, -1)) {
     node = node.children[index];
     setCurrentNode(node);
     await (node as ChildNode).callback();
@@ -286,7 +298,8 @@ export async function runTest(options: RunTestOptions): Promise<void> {
 
       node = node.parent;
 
-      startIndex = nodeLocation[--depth] + 1;
+      nodeLocation[depth] = 0;
+      startIndex = ++nodeLocation[--depth];
 
       if (startIndex < node.children.length) {
         continue traversal;
@@ -367,7 +380,7 @@ export function createRunMeasure(options: RunMeasureOptions): (node: MeasureNode
     }
 
     let totalIterationCount = 0;
-    let percentage = 0;
+    let prevPercentage = 0;
 
     const measureTimestamp = Date.now();
 
@@ -412,13 +425,20 @@ export function createRunMeasure(options: RunMeasureOptions): (node: MeasureNode
           return;
         }
 
-        percentage = Math.max(
-          percentage,
-          measureDuration / measureTimeout || 0,
-          totalIterationCount > 2 ? targetRme / rme || 0 : 0
-        );
+        const nextPercentage =
+          Math.trunc(
+            Math.max(
+              prevPercentage,
+              measureDuration / measureTimeout || 0,
+              totalIterationCount > 2 ? targetRme / rme || 0 : 0
+            ) * 1000
+          ) / 1000;
 
-        sendMessage({ type: 'measureProgress', percentage });
+        if (prevPercentage !== nextPercentage) {
+          prevPercentage = nextPercentage;
+
+          sendMessage({ type: 'measureProgress', percentage: nextPercentage });
+        }
 
         if (Date.now() - batchTimestamp > batchTimeout || iterationCount >= batchIterationCount) {
           // Schedule the next measurement batch
@@ -452,7 +472,7 @@ export function createRunMeasure(options: RunMeasureOptions): (node: MeasureNode
   };
 }
 
-let currentNode: Node = new TestSuiteNode({});
+let currentNode: Node = new TestSuiteNode();
 
 export function getCurrentNode(): Node {
   return currentNode;

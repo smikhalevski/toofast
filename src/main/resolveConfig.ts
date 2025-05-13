@@ -1,11 +1,12 @@
 import fs from 'fs';
+import path from 'path';
 import glob from 'fast-glob';
 import * as d from 'doubter';
 import globToRegExp from 'glob-to-regexp';
 import { parseArgs } from 'argcat';
 import { TestOptions } from './index.js';
 
-const CONFIG_PATHS = ['.toofastrc', 'toofast.json', 'toofast.config.json'];
+const CONFIG_FILES = ['.toofastrc', 'toofast.json', 'toofast.config.json'];
 
 const INCLUDE_GLOBS = ['**/*.perf.js', '**/*.perf.mjs', '**/*.perf.ts', '**/*.perf.mts'];
 
@@ -56,7 +57,7 @@ const testOptionsShape = d
 /**
  * Shape of a config read from a file.
  */
-export const configShape = d
+const configShape = d
   .object({
     testOptions: testOptionsShape,
 
@@ -80,12 +81,12 @@ export interface Config {
   /**
    * An array of URIs of modules that are loaded before each test suite.
    */
-  setupFilePaths: string[];
+  setupFiles: string[];
 
   /**
    * An array of URIs of test suite modules.
    */
-  testFilePaths: string[];
+  testFiles: string[];
 
   /**
    * A list of test name patterns.
@@ -101,21 +102,37 @@ export interface Config {
 /**
  * Parses CLI arguments and loads config from a file if needed.
  */
-export function resolveConfig(baseDir = process.cwd()): Config {
-  const args = processArgsShape.parse(parseArgs(process.argv.slice(2)));
+export function resolveConfig(argv = process.argv, cwd = process.cwd()): Config {
+  const args = processArgsShape.parse(parseArgs(argv.slice(2)));
 
-  const configFile = args.config || CONFIG_PATHS.find(filePath => fs.existsSync(filePath));
+  const configFile = args.config || CONFIG_FILES.find(file => fs.existsSync(path.resolve(cwd, file)));
 
-  const config = configFile === undefined ? {} : configShape.parse(JSON.parse(fs.readFileSync(configFile, 'utf8')));
+  const config =
+    configFile === undefined
+      ? {}
+      : configShape.parse(JSON.parse(fs.readFileSync(path.resolve(cwd, configFile), 'utf8')));
 
-  const setup = args.setup || config.setup || [];
-  const include = args.include || config.include || INCLUDE_GLOBS;
+  const baseDir = configFile === undefined ? cwd : path.dirname(path.resolve(cwd, configFile));
+
+  const setupFiles =
+    args.setup?.flatMap(src => resolveFiles(src, cwd)) ||
+    config.setup?.flatMap(src => resolveFiles(src, baseDir)) ||
+    [];
+
+  const testFiles =
+    args.include?.flatMap(src => resolveFiles(src, cwd)) ||
+    config.include?.flatMap(src => resolveFiles(src, baseDir)) ||
+    INCLUDE_GLOBS.flatMap(src => resolveFiles(src, cwd));
 
   return {
     baseDir,
-    setupFilePaths: setup.flatMap(src => glob.sync(src, { cwd: baseDir, absolute: true })),
-    testFilePaths: include.flatMap(src => glob.sync(src, { cwd: baseDir, absolute: true })),
+    setupFiles,
+    testFiles,
     testRegExps: args[''].map(src => globToRegExp(src, { flags: 'i' })),
-    testOptions: { ...config.testOptions, ...args },
+    testOptions: { ...config.testOptions, ...testOptionsShape.parse(args) },
   };
+}
+
+function resolveFiles(src: string, cwd: string): string[] {
+  return glob.sync(src, { absolute: true, cwd });
 }
