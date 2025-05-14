@@ -4,6 +4,20 @@ function factorial(x) {
   return x === 0 ? 1 : x * factorial(x - 1);
 }
 
+describe('factorial', () => {
+  test('of 33', () => {
+    measure(() => {
+      factorial(33);
+    });
+  });
+
+  test('of 42', () => {
+    measure(() => {
+      factorial(42);
+    });
+  });
+});
+
 describe('describe 0', () => {
   test('test 0.0', () => {
     measure(() => {

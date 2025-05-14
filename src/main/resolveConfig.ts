@@ -8,7 +8,7 @@ import { TestOptions } from './index.js';
 
 const CONFIG_FILES = ['.toofastrc', 'toofast.json', 'toofast.config.json'];
 
-const INCLUDE_GLOBS = ['**/*.perf.js', '**/*.perf.mjs', '**/*.perf.ts', '**/*.perf.mts'];
+const INCLUDE_GLOBS = ['**/*.perf.{js,mjs,ts,mts}'];
 
 /**
  * Shape of CLI arguments.
