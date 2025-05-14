@@ -3,7 +3,10 @@ import rl from 'readline';
 import { BlockChild, RunnerMessage } from './runner-api.js';
 
 const MESSAGE_PADDING = '  ';
-const MESSAGE_PENDING = dim('○ ');
+const MESSAGE_PENDING_0 = dim('○ ');
+const MESSAGE_PENDING_25 = dim('◔ ');
+const MESSAGE_PENDING_50 = dim('◑ ');
+const MESSAGE_PENDING_75 = dim('◕ ');
 const MESSAGE_PENDING_ERROR = red('○ ');
 const MESSAGE_WARMUP = yellow('● ');
 const MESSAGE_ERROR = red('● ');
@@ -59,7 +62,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
 
         clearLine();
         print(
-          (hasMargin ? NEW_LINE : '') + MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING + testName + MESSAGE_PADDING
+          (hasMargin ? NEW_LINE : '') + MESSAGE_PADDING.repeat(depth) + MESSAGE_PENDING_0 + testName + MESSAGE_PADDING
         );
 
         hasMargin = false;
@@ -117,14 +120,23 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
         break;
 
       case 'measureProgress':
+        const { percentage } = message;
         clearLine();
         print(
           MESSAGE_PADDING.repeat(depth) +
-            (errorMessage !== undefined ? MESSAGE_PENDING_ERROR : MESSAGE_PENDING) +
+            (errorMessage !== undefined
+              ? MESSAGE_PENDING_ERROR
+              : percentage < 0.25
+                ? MESSAGE_PENDING_0
+                : percentage < 0.5
+                  ? MESSAGE_PENDING_25
+                  : percentage < 0.75
+                    ? MESSAGE_PENDING_50
+                    : MESSAGE_PENDING_75) +
             testName +
             MESSAGE_PADDING +
             formatMeasureIndex(measureIndex, blocks[blocks.length - 1].length) +
-            formatPercent(message.percentage)
+            formatPercent(percentage)
         );
         break;
     }
