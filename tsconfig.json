@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-    "skipLibCheck": true,
-    "moduleResolution": "Node",
-    "esModuleInterop": true,
-    "noUnusedLocals": true,
+    "declaration": true,
+    "isolatedModules": true,
     "strict": true,
-    "target": "ES5",
-    "module": "ES6"
+    //    "noUnusedLocals": true,
+    //    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "target": "ES2017",
+    "module": "NodeNext",
+    "lib": ["ES2020"],
+    "outDir": "./lib"
   },
-  "include": [
-    "./src/main/**/*"
-  ]
+  "include": ["./src/**/*"]
 }

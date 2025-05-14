@@ -3,6 +3,10 @@
   "includeVersion": true,
   "excludePrivate": true,
   "excludeExternals": true,
+  "excludeInternal": true,
   "disableSources": true,
-  "readme": "none"
+  "hideGenerator": true,
+  "readme": "none",
+  "tsconfig": "./tsconfig.build.json",
+  "entryPoints": ["./src/main/index.ts"]
 }
