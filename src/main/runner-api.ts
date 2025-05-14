@@ -93,6 +93,24 @@ export class Node {
 
     return this;
   }
+
+  getBlockChildren(): BlockChild[] {
+    const children: BlockChild[] = [];
+
+    for (const child of this.children) {
+      if (child instanceof DescribeNode) {
+        children.push({ type: 'describe', name: child.name });
+      }
+      if (child instanceof TestNode) {
+        children.push({ type: 'test', name: child.name });
+      }
+      if (child instanceof MeasureNode) {
+        children.push({ type: 'measure' });
+      }
+    }
+
+    return children;
+  }
 }
 
 export class TestSuiteNode extends Node {
@@ -143,6 +161,8 @@ export class MeasureNode extends Node {
   }
 }
 
+export type BlockChild = { type: 'describe'; name: string } | { type: 'test'; name: string } | { type: 'measure' };
+
 export type RunnerMessage =
   | { type: 'fatalError'; errorMessage: string }
   | { type: 'testSuiteStart' }
@@ -151,6 +171,8 @@ export type RunnerMessage =
   | { type: 'describeEnd' }
   | { type: 'testStart'; name: string; nodeLocation: number[] }
   | { type: 'testEnd'; durationStats: HistogramStats; memoryStats: HistogramStats }
+  | { type: 'blockStart'; kind: 'testSuite' | 'describe' | 'test'; children: BlockChild[] }
+  | { type: 'blockEnd' }
   | { type: 'error'; errorMessage: string }
   | { type: 'measureWarmupStart' }
   | { type: 'measureWarmupEnd' }
@@ -229,6 +251,14 @@ export async function runTest(options: RunTestOptions): Promise<void> {
   }
 
   traversal: while (true) {
+    if (startIndex === 0) {
+      sendMessage({
+        type: 'blockStart',
+        kind: node instanceof TestSuiteNode ? 'testSuite' : 'describe',
+        children: node.getBlockChildren(),
+      });
+    }
+
     for (let i = startIndex; i < node.children.length; ++i) {
       const child = node.children[i];
 
@@ -247,6 +277,7 @@ export async function runTest(options: RunTestOptions): Promise<void> {
         } catch (error) {
           // Skip describe block after an error
           sendMessage({ type: 'error', errorMessage: getErrorMessage(error) });
+          sendMessage({ type: 'blockEnd' });
           sendMessage({ type: 'describeEnd' });
           continue;
         }
@@ -269,10 +300,15 @@ export async function runTest(options: RunTestOptions): Promise<void> {
         const durationHistogram = new Histogram();
         const memoryHistogram = new Histogram();
 
+        let isBlockStarted = false;
+
         try {
           await child.beforeEachHook?.();
 
           await child.callback();
+
+          sendMessage({ type: 'blockStart', kind: 'test', children: child.getBlockChildren() });
+          isBlockStarted = true;
 
           for (const node of child.children) {
             const result = await runMeasure(node as MeasureNode);
@@ -285,9 +321,13 @@ export async function runTest(options: RunTestOptions): Promise<void> {
 
           await child.afterEachHook?.();
         } catch (error) {
+          if (!isBlockStarted) {
+            sendMessage({ type: 'blockStart', kind: 'test', children: [] });
+          }
           sendMessage({ type: 'error', errorMessage: getErrorMessage(error) });
         }
 
+        sendMessage({ type: 'blockEnd' });
         sendMessage({
           type: 'testEnd',
           durationStats: durationHistogram.getStats(),
@@ -299,6 +339,7 @@ export async function runTest(options: RunTestOptions): Promise<void> {
     }
 
     while (node.parent !== null) {
+      sendMessage({ type: 'blockEnd' });
       sendMessage({ type: 'describeEnd' });
 
       node = node.parent;
@@ -314,6 +355,7 @@ export async function runTest(options: RunTestOptions): Promise<void> {
     break;
   }
 
+  sendMessage({ type: 'blockEnd' });
   sendMessage({ type: 'testSuiteEnd' });
 }
 

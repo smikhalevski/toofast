@@ -1,6 +1,6 @@
 import { bold, dim, green, red, yellow } from 'kleur/colors';
 import rl from 'readline';
-import { RunnerMessage } from './runner-api.js';
+import { BlockChild, RunnerMessage } from './runner-api.js';
 
 const MESSAGE_PADDING = '  ';
 const MESSAGE_PENDING = dim('○ ');
@@ -14,11 +14,21 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
   let depth = 0;
   let testName: string;
   let errorMessage: string | undefined;
-  let measureCount = 0;
+  let measureIndex = 0;
   let hasMargin = false;
+
+  const blocks: BlockChild[][] = [];
 
   return message => {
     switch (message.type) {
+      case 'blockStart':
+        blocks.push(message.children);
+        break;
+
+      case 'blockEnd':
+        blocks.pop();
+        break;
+
       case 'fatalError':
         print(NEW_LINE + red(message.errorMessage) + NEW_LINE);
         break;
@@ -39,8 +49,13 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
         break;
 
       case 'testStart':
-        testName = message.name; //.padEnd(message.maxPeerNameLength);
-        measureCount = 0;
+        const maxTestNameLength = blocks[blocks.length - 1].reduce(
+          (length, child) => (child.type === 'test' ? Math.max(length, child.name.length) : length),
+          0
+        );
+
+        testName = message.name.padEnd(maxTestNameLength);
+        measureIndex = 0;
 
         clearLine();
         print(
@@ -80,7 +95,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
             MESSAGE_WARMUP +
             testName +
             MESSAGE_PADDING +
-            formatMeasureCount(measureCount) +
+            formatMeasureIndex(measureIndex, blocks[blocks.length - 1].length) +
             MESSAGE_PADDING
         );
         break;
@@ -92,7 +107,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
         break;
 
       case 'measureEnd':
-        ++measureCount;
+        ++measureIndex;
         break;
 
       case 'measureError':
@@ -108,7 +123,7 @@ export function createNodeLogger(): (message: RunnerMessage) => void {
             (errorMessage !== undefined ? MESSAGE_PENDING_ERROR : MESSAGE_PENDING) +
             testName +
             MESSAGE_PADDING +
-            formatMeasureCount(measureCount) +
+            formatMeasureIndex(measureIndex, blocks[blocks.length - 1].length) +
             formatPercent(message.percentage)
         );
         break;
@@ -140,8 +155,8 @@ const rmeFormat = new Intl.NumberFormat('en', {
   style: 'percent',
 });
 
-function formatMeasureCount(count: number): string {
-  return count > 0 ? dim(integerFormat.format(count + 1) + 'x') : '';
+function formatMeasureIndex(index: number, count: number): string {
+  return count === 1 ? '' : dim(integerFormat.format(index + 1) + '/' + integerFormat.format(count));
 }
 
 function formatMeasurement(value: number, unit: string): string {

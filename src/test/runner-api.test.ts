@@ -351,20 +351,44 @@ describe('runTest', () => {
 
     expect(runMeasureMock).toHaveBeenCalledTimes(1);
 
-    expect(sendMessageMock).toHaveBeenCalledTimes(4);
+    expect(sendMessageMock).toHaveBeenCalledTimes(8);
     expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
       type: 'testSuiteStart',
     } satisfies RunnerMessage);
     expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+      type: 'blockStart',
+      kind: 'testSuite',
+      children: [
+        { type: 'describe', name: 'describe1' },
+        { type: 'describe', name: 'describe2' },
+      ],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
       type: 'describeStart',
       name: 'describe1',
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
+      type: 'blockStart',
+      kind: 'describe',
+      children: [
+        { type: 'test', name: 'test11' },
+        { type: 'test', name: 'test12' },
+      ],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(5, {
       type: 'testStart',
       name: 'test11',
       nodeLocation: [0, 0],
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(6, {
+      type: 'blockStart',
+      kind: 'test',
+      children: [{ type: 'measure' }],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(7, {
+      type: 'blockEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(8, {
       type: 'testEnd',
       durationStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
       memoryStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
@@ -387,13 +411,21 @@ describe('runTest', () => {
 
     expect(runMeasureMock).toHaveBeenCalledTimes(1);
 
-    expect(sendMessageMock).toHaveBeenCalledTimes(2);
+    expect(sendMessageMock).toHaveBeenCalledTimes(4);
     expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
       type: 'testStart',
       name: 'test12',
       nodeLocation: [0, 1],
     } satisfies RunnerMessage);
     expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+      type: 'blockStart',
+      kind: 'test',
+      children: [{ type: 'measure' }],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
+      type: 'blockEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
       type: 'testEnd',
       durationStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
       memoryStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
@@ -417,20 +449,40 @@ describe('runTest', () => {
 
     expect(runMeasureMock).toHaveBeenCalledTimes(1);
 
-    expect(sendMessageMock).toHaveBeenCalledTimes(4);
+    expect(sendMessageMock).toHaveBeenCalledTimes(8);
     expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
-      type: 'describeEnd',
+      type: 'blockEnd',
     } satisfies RunnerMessage);
     expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+      type: 'describeEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
       type: 'describeStart',
       name: 'describe2',
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
+      type: 'blockStart',
+      kind: 'describe',
+      children: [
+        { type: 'test', name: 'test21' },
+        { type: 'test', name: 'test22' },
+        { type: 'test', name: 'test23' },
+      ],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(5, {
       type: 'testStart',
       name: 'test21',
       nodeLocation: [1, 0],
     } satisfies RunnerMessage);
-    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
+    expect(sendMessageMock).toHaveBeenNthCalledWith(6, {
+      type: 'blockStart',
+      kind: 'test',
+      children: [{ type: 'measure' }],
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(7, {
+      type: 'blockEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(8, {
       type: 'testEnd',
       durationStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
       memoryStats: { hz: 0, mean: 0, moe: 0, rme: 0, sd: 0, sem: 0, size: 0, variance: 0 },
@@ -452,11 +504,17 @@ describe('runTest', () => {
 
     expect(runMeasureMock).toHaveBeenCalledTimes(0);
 
-    expect(sendMessageMock).toHaveBeenCalledTimes(2);
+    expect(sendMessageMock).toHaveBeenCalledTimes(4);
     expect(sendMessageMock).toHaveBeenNthCalledWith(1, {
-      type: 'describeEnd',
+      type: 'blockEnd',
     } satisfies RunnerMessage);
     expect(sendMessageMock).toHaveBeenNthCalledWith(2, {
+      type: 'describeEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(3, {
+      type: 'blockEnd',
+    } satisfies RunnerMessage);
+    expect(sendMessageMock).toHaveBeenNthCalledWith(4, {
       type: 'testSuiteEnd',
     } satisfies RunnerMessage);
   });
