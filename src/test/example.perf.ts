@@ -1,3 +1,4 @@
+// @ts-ignore
 import { describe, test, measure } from '../../lib/index.js';
 
 function factorial(x: number): number {
