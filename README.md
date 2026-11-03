@@ -76,9 +76,11 @@ TooFast prints results of each test:
 
 <br>
 
-<p align="center">
-  <img alt="Test results" src="./assets/screenshot.svg" width="430" />
-</p>
+<p align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/screenshot-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="./assets/screenshot-light.svg" />
+  <img alt="Test results" src="./assets/screenshot-light.svg" width="430" />
+</picture></p>
 
 <br>
 
@@ -196,9 +198,11 @@ test is prefixed with names of its groups, separated by dots: `Math.factorial.of
 
 Hooks run code at different phases of a test:
 
-<p align="center">
-  <img alt="Lifecycle hooks" src="./assets/hooks.svg" width="350" />
-</p>
+<p align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/hooks-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="./assets/hooks-light.svg" />
+  <img alt="Lifecycle hooks" src="./assets/hooks-light.svg" width="240" />
+</picture></p>
 
 - `beforeEach` and `afterEach` run around each test. They can be registered in a test file or in a `describe` block, but
   not inside a test, since the test has already started by then.

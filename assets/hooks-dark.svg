@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="238" height="409" viewBox="0 0 238 409" role="img"
+     aria-labelledby="title desc">
+    <title id="title">Hook order</title>
+    <desc id="desc">beforeEach, then the test. For each measure the test runs beforeWarmup, one batch and afterWarmup,
+        then batches until the measure is over. A batch runs beforeIteration, callback and afterIteration N times
+        between beforeBatch and afterBatch. Finally afterEach.
+    </desc>
+    <!-- Colours sit at the same luminance, so each has about 6:1 contrast on GitHub's dark background. -->
+    <style>
+        svg { color: #8a929a; }
+        text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 14px; fill: currentColor; }
+        path { fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+        .each { color: #a77aee; }
+        .warmup { color: #dc7533; }
+        .batch { color: #5293e5; }
+        .iteration { color: #47a44e; }
+        .test { stroke-dasharray: 0 3; }
+    </style>
+
+    <!-- shifted half a pixel, so 1px strokes cover whole pixels instead of blurring across two -->
+    <g transform="translate(0.5 0.5)">
+        <!-- test box, its top edge leaves a gap for the title -->
+        <path class="test"
+              d="M78 36 H230 A6 6 0 0 1 236 42 V368 A6 6 0 0 1 230 374 H26 A6 6 0 0 1 20 368 V42 A6 6 0 0 1 26 36 H32"/>
+
+        <!-- before/after hook pairs -->
+        <path class="each" d="M14 10 H7 A5 5 0 0 0 2 15 V395 A5 5 0 0 0 7 400 H14"/>
+        <path class="warmup" d="M50 62 H43 A5 5 0 0 0 38 67 V213 A5 5 0 0 0 43 218 H50"/>
+        <path class="batch" d="M68 88 H61 A5 5 0 0 0 56 93 V187 A5 5 0 0 0 61 192 H68"/>
+        <path class="iteration" d="M86 114 H79 A5 5 0 0 0 74 119 V161 A5 5 0 0 0 79 166 H86"/>
+        <path class="batch" d="M50 244 H43 A5 5 0 0 0 38 249 V343 A5 5 0 0 0 43 348 H50"/>
+        <path class="iteration" d="M68 270 H61 A5 5 0 0 0 56 275 V317 A5 5 0 0 0 61 322 H68"/>
+    </g>
+
+    <text x="38" y="41">Test</text>
+    <text x="20" y="15" class="each">beforeEach</text>
+    <text x="56" y="67" class="warmup">beforeWarmup</text>
+    <text x="74" y="93" class="batch">beforeBatch</text>
+    <text x="92" y="119" class="iteration">beforeIteration</text>
+    <text x="92" y="145">callback</text>
+    <text x="92" y="171" class="iteration">afterIteration</text>
+    <text x="74" y="197" class="batch">afterBatch</text>
+    <text x="56" y="223" class="warmup">afterWarmup</text>
+    <text x="56" y="249" class="batch">beforeBatch</text>
+    <text x="74" y="275" class="iteration">beforeIteration</text>
+    <text x="74" y="301">callback</text>
+    <text x="74" y="327" class="iteration">afterIteration</text>
+    <text x="56" y="353" class="batch">afterBatch</text>
+    <text x="20" y="405" class="each">afterEach</text>
+</svg>
