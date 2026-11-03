@@ -1,6 +1,6 @@
 import { describe, test, measure } from '../../lib/index.js';
 
-function factorial(x) {
+function factorial(x: number): number {
   return x === 0 ? 1 : x * factorial(x - 1);
 }
 
@@ -51,21 +51,21 @@ describe('describe 0', () => {
 
   describe('describe 0.2', () => {
     test('test 0.2.0 (stack overflow)', () => {
-      const stackOverflow = () => stackOverflow();
+      const stackOverflow = (): unknown => stackOverflow();
       stackOverflow();
     });
 
     test('test 0.2.1 (multiple measurements)', () => {
-      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
+      measure({ measureTimeout: 5_000, targetRme: 0.01 }, () => 'a' + 'b');
 
-      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
+      measure({ measureTimeout: 5_000, targetRme: 0.01 }, () => 'a' + 'b');
 
-      measure(() => 'a' + 'b', { measureTimeout: 5_000, targetRme: 0 });
+      measure({ measureTimeout: 5_000, targetRme: 0.01 }, () => 'a' + 'b');
     });
   });
 
   test('test 0.1.2 (long warmup)', () => {
-    measure(() => 'a' + 'b', { warmupIterationCount: 100_000_000 });
+    measure({ maxWarmupBatchIterationCount: 100_000_000 }, () => 'a' + 'b');
   });
 });
 

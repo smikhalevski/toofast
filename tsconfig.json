@@ -3,12 +3,15 @@
     "declaration": true,
     "isolatedModules": true,
     "strict": true,
-    //    "noUnusedLocals": true,
-    //    "noUnusedParameters": true,
+    "noUnusedLocals": true,
     "skipLibCheck": true,
-    "target": "ES2017",
+    "target": "ES2020",
     "module": "NodeNext",
     "lib": ["ES2020"],
+    "types": ["node"],
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "outDir": "./lib"
   },
   "include": ["./src/**/*"]

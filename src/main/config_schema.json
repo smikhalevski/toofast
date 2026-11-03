@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TooFast config",
+  "description": "The config file of TooFast. Patterns are relative to the config file.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "The path or the URL of this schema, so editors can validate the config file.",
+      "type": "string"
+    },
+    "setupFilePatterns": {
+      "description": "Glob patterns of modules that are loaded before each test file.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "testFilePatterns": {
+      "description": "Glob patterns of test files. Files in node_modules are never run.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["**/*.perf.{js,mjs,ts,mts}"]
+    },
+    "testOptions": {
+      "description": "Default test options of all tests. Options passed to describe(), test() and measure() override them.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "measureTimeout": {
+          "description": "The maximum duration of a measure in milliseconds, not counting warmup. When it's reached, the measure stops even if targetRme isn't reached yet.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 10000
+        },
+        "targetRme": {
+          "description": "The relative margin of error at which the measure stops, between 0 and 1. For example, 0.05 stops the measure when the mean call duration is known within ±5% at 95% confidence.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1,
+          "default": 0.05
+        },
+        "minBatchCount": {
+          "description": "The minimum number of batches before targetRme can stop the measure. A few batches may agree by chance, for example, while the CPU is changing its frequency. measureTimeout still stops the measure if it's reached first.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 5
+        },
+        "maxWarmupBatchIterationCount": {
+          "description": "The maximum number of calls during warmup. V8 optimizes a function after it has been called many times, so warmup keeps slow unoptimized calls out of the results. Warmup is also limited by batchTimeout and maxBatchIterationCount. Set to 0 to skip warmup.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 10000
+        },
+        "maxBatchIterationCount": {
+          "description": "The maximum number of calls in a batch, including untimed calls that measure memory and calibrate loops. Set it if beforeBatch prepares data for a limited number of calls. Unlimited by default.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "batchTimeout": {
+          "description": "The maximum duration of a batch in milliseconds. A batch always times at least one loop, even if that loop takes longer.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 1000
+        },
+        "batchPauseDuration": {
+          "description": "The pause after each batch in milliseconds. It gives the garbage collector time to run between batches instead of during them.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 200
+        },
+        "minLoopDuration": {
+          "description": "The minimum duration of a timed loop in milliseconds. A fast callback is called many times in a loop that is timed as a whole, so the overhead and resolution of the timer don't distort results. Loops are shorter if maxBatchIterationCount is too small, and have a single call if there are beforeIteration or afterIteration hooks.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "maxBatchMemorySampleCount": {
+          "description": "The maximum number of memory samples in a batch. A memory sample is an extra call after a loop, which measures how many bytes the callback allocates instead of how long it takes. Set to 0 to skip measuring memory.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 10
+        }
+      }
+    }
+  }
+}

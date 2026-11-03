@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="437" height="185" viewBox="0 0 437 185" role="img"
+     aria-labelledby="title desc">
+    <title id="title">toofast output</title>
+    <desc id="desc">Running npx toofast prints the factorial test: of 33 passed with 4.2 MHz ± 2.29% and 314.9 B ±
+        2.67%, of 42 passed with 3.3 MHz ± 1.1% and 458.8 B ± 1.87%.
+    </desc>
+    <!-- Colours sit at the same luminance, so each has about 4.35:1 contrast on both white and GitHub's dark background. -->
+    <style>
+        svg { color: #727a82; }
+        text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 14px; fill: currentColor; }
+        rect, path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+        }
+        .value { fill: #99730d; }
+        .passed { stroke: #2c8b36; }
+        /* macOS window buttons, the darker edge keeps them visible on white */
+        circle { stroke-width: 1; }
+        .close { fill: #ff5f57; stroke: #e0443e; }
+        .minimize { fill: #febc2e; stroke: #dea123; }
+        .zoom { fill: #28c840; stroke: #1aab29; }
+    </style>
+
+    <!-- terminal window -->
+    <rect x="1" y="1" width="435" height="183" rx="6"/>
+    <circle class="close" cx="26" cy="24" r="6"/>
+    <circle class="minimize" cx="46" cy="24" r="6"/>
+    <circle class="zoom" cx="66" cy="24" r="6"/>
+
+    <!-- columns are 8.4px apart, the width of one character -->
+    <text x="20" y="73">npx toofast</text>
+    <text x="20" y="117">factorial</text>
+
+    <path class="passed" d="M37.8 134.8 L40.2 137.6 L44.4 130.6"/>
+    <text x="53.6" y="139">of 33</text>
+    <text x="129.2" y="139">
+        <tspan class="value">4.2</tspan>
+        MHz
+    </text>
+    <text x="196.4" y="139">± 2.29%</text>
+    <text x="280.4" y="139">
+        <tspan class="value">314.9</tspan>
+        B
+    </text>
+    <text x="356" y="139">± 2.67%</text>
+
+    <path class="passed" d="M37.8 156.8 L40.2 159.6 L44.4 152.6"/>
+    <text x="53.6" y="161">of 42</text>
+    <text x="129.2" y="161">
+        <tspan class="value">3.3</tspan>
+        MHz
+    </text>
+    <text x="196.4" y="161">± 1.1%</text>
+    <text x="280.4" y="161">
+        <tspan class="value">458.8</tspan>
+        B
+    </text>
+    <text x="356" y="161">± 1.87%</text>
+</svg>
