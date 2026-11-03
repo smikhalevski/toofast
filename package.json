@@ -17,7 +17,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && cp package.json README.md LICENSE.txt src/main/config_schema.json lib/ && cd lib && npm pkg delete scripts devDependencies",
+    "build": "tsc --project tsconfig.build.json && chmod +x lib/nodejs/cli.js && cp package.json README.md LICENSE.txt src/main/config_schema.json lib/ && cd lib && npm pkg delete scripts devDependencies",
     "clean": "rimraf lib docs coverage",
     "test": "([ -d lib ] || npm run build) && vitest run",
     "lint": "oxlint --tsconfig tsconfig.json src/main",
