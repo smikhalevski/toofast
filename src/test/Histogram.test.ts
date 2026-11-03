@@ -54,7 +54,7 @@ describe('Histogram', () => {
       histogram.add(i % 2);
     }
 
-    expect(histogram.moe).toBeCloseTo(histogram.sem * 1.98);
+    expect(histogram.moe / histogram.sem).toBeCloseTo(1.98, 4);
   });
 
   test('variance is 0 if all values are equal', () => {

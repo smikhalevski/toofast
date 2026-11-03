@@ -1,12 +1,14 @@
 import { fork } from 'child_process';
-import { fileURLToPath } from 'url';
+import path from 'path';
+import { emptyHistogramSnapshot } from '../Histogram.ts';
 import type { TestOptions } from '../index.ts';
 import type { Block, WorkerEvent, WorkerJob } from '../runner.ts';
 import { getErrorMessage } from '../utils.ts';
 import type { Reporter } from './createReporter.ts';
 import type { Config } from './resolveConfig.ts';
 
-const WORKER_FILE = fileURLToPath(new URL('./worker.ts', import.meta.url));
+// Sources have the .ts extension, and the build has the .js extension
+const WORKER_FILE = path.join(import.meta.dirname, 'worker' + path.extname(import.meta.filename));
 
 const WORKER_EXEC_ARGV = getWorkerExecArgv();
 
@@ -30,34 +32,43 @@ export interface RunTestFilesParams {
 }
 
 /**
- * Runs tests in worker processes and exits. A worker first collects blocks of a test file, then each test runs in a new
- * worker.
+ * Runs tests in worker processes and exits. For each test file, a worker collects describe blocks and tests, and then
+ * each test runs in a new worker.
  *
- * Exits with code 1 if a test or a describe block throws. A test file that can't be imported, or a worker that exits
- * unexpectedly, stops the run.
+ * If a test file can't be imported, or a worker exits before it finishes, the error is reported and other tests still
+ * run. Exits with code 1 if there were errors or no tests.
  */
 export async function runTestFiles(params: RunTestFilesParams): Promise<void> {
   const { config, reporter } = params;
   const { setupFiles, testFiles, testNamePatterns, testOptions } = config;
 
+  let testCount = 0;
   let errorCount = 0;
 
-  try {
-    for (const testFile of testFiles) {
-      let blocks: Block[] = [];
+  for (const testFile of testFiles) {
+    let blocks: Block[] = [];
 
+    try {
       await runJobInWorker({ type: 'collect_blocks', setupFiles, testFile, testOptions }, event => {
         if (event.type === 'blocks_collected') {
           blocks = event.blocks;
         }
       });
-
-      pruneBlocks(blocks, testNamePatterns);
-
-      errorCount += await runBlocks({ blocks, setupFiles, testFile, testOptions, reporter });
+    } catch (error) {
+      reporter.printError(getErrorMessage(error));
+      errorCount++;
+      continue;
     }
-  } catch (error) {
-    reporter.printError(getErrorMessage(error));
+
+    pruneBlocks(blocks, testNamePatterns);
+
+    testCount += getTestCount(blocks);
+    errorCount += await runBlocks({ blocks, setupFiles, testFile, testOptions, reporter });
+  }
+
+  if (testCount === 0 && errorCount === 0) {
+    // For example, test file patterns or test name patterns have a typo
+    reporter.printError('No tests found');
     errorCount++;
   }
 
@@ -79,7 +90,7 @@ interface RunBlocksParams {
 async function runBlocks(params: RunBlocksParams): Promise<number> {
   const { blocks, setupFiles, testFile, testOptions, reporter } = params;
 
-  // Results of sibling tests are padded
+  // Results of sibling tests are aligned
   const nameLength = getMaxTestNameLength(blocks);
 
   let errorCount = 0;
@@ -101,18 +112,35 @@ async function runBlocks(params: RunBlocksParams): Promise<number> {
 
     reporter.printTestStart(block.name.padEnd(nameLength));
 
-    await runJobInWorker({ type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path }, event => {
-      if (event.type === 'error_caught') {
-        errorCount++;
-      }
-      reporter.printTestEvent(event);
-    });
+    try {
+      await runJobInWorker({ type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path }, event => {
+        if (event.type === 'error_caught') {
+          errorCount++;
+        }
+        reporter.printTestEvent(event);
+      });
+    } catch (error) {
+      // The worker didn't end the test, so the test ends here without results
+      reporter.printTestEvent({
+        type: 'error_caught',
+        errorMessage: getErrorMessage(error),
+      });
+
+      reporter.printTestEvent({
+        type: 'test_ended',
+        durationSnapshot: emptyHistogramSnapshot,
+        memorySnapshot: emptyHistogramSnapshot,
+      });
+
+      errorCount++;
+    }
   }
+
   return errorCount;
 }
 
 /**
- * Runs a job in a new worker. Rejects if the worker can't import a file, or exits before it finishes the job.
+ * Runs a job in a new worker. Rejects if the job fails, or if the worker exits before the job ends.
  */
 function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => void): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -122,17 +150,17 @@ function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => voi
     // The job is sent over IPC, since the command line length is limited
     worker.send(job);
 
-    let isJobFinished = false;
+    let isJobEnded = false;
 
     worker.on('message', (event: WorkerEvent) => {
-      if (event.type === 'file_failed') {
+      if (event.type === 'job_failed') {
         reject(new Error(event.errorMessage));
         return;
       }
 
-      // The last event of a job
+      // The last message of a job that succeeded
       if (event.type === 'blocks_collected' || event.type === 'test_ended') {
-        isJobFinished = true;
+        isJobEnded = true;
       }
 
       handleEvent(event);
@@ -141,7 +169,7 @@ function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => voi
     worker.on('error', reject);
 
     worker.on('close', exitCode => {
-      if (isJobFinished) {
+      if (isJobEnded) {
         resolve();
       } else {
         reject(new Error('Test process exited unexpectedly: ' + exitCode));
@@ -151,8 +179,8 @@ function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => voi
 }
 
 /**
- * Removes tests which names don't match any of patterns, and describe blocks that have no tests left. Describe blocks
- * that have thrown an error are kept, so the error is reported.
+ * Removes tests whose names don't match any of the patterns, and describe blocks that have no tests left. Describe
+ * blocks that have thrown an error are kept, so the error is reported.
  *
  * @param blocks Blocks that are pruned in place.
  * @param testNamePatterns Patterns of test names prefixed with names of enclosing describe blocks. If empty, all tests
@@ -182,6 +210,16 @@ function shouldPruneBlock(block: Block, name: string, testNamePatterns: RegExp[]
   return testNamePatterns.length !== 0 && !testNamePatterns.some(pattern => pattern.test(name));
 }
 
+function getTestCount(blocks: Block[]): number {
+  let testCount = 0;
+
+  for (const block of blocks) {
+    testCount += block.kind === 'test' ? 1 : getTestCount(block.children);
+  }
+
+  return testCount;
+}
+
 function getMaxTestNameLength(blocks: Block[]): number {
   let maxLength = 0;
 
@@ -190,5 +228,6 @@ function getMaxTestNameLength(blocks: Block[]): number {
       maxLength = Math.max(maxLength, block.name.length);
     }
   }
+
   return maxLength;
 }

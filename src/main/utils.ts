@@ -36,6 +36,10 @@ export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+export function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return isObject(value) && typeof value.then === 'function';
+}
+
 export function isArrayOf<T>(value: unknown, predicate: (item: unknown) => item is T): value is T[] {
   return Array.isArray(value) && value.every(predicate);
 }

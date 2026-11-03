@@ -1,6 +1,14 @@
 import { Histogram, type HistogramSnapshot } from './Histogram.ts';
 import type { HookCallback, TestOptions } from './index.ts';
-import { assert, getErrorStackOrMessage, isNonNegativeInteger, isPositiveInteger, noop, sleep } from './utils.ts';
+import {
+  assert,
+  getErrorStackOrMessage,
+  isNonNegativeInteger,
+  isPositiveInteger,
+  isPromiseLike,
+  noop,
+  sleep,
+} from './utils.ts';
 
 export type NodeKind = 'test_suite' | 'describe' | 'test' | 'measure';
 
@@ -20,7 +28,7 @@ export interface Hook {
 }
 
 /**
- * A test suite of a test file, a describe block, a test or a measure.
+ * A node of the tree that a test file declares: the test suite at the root, describe blocks, tests and measures.
  */
 export interface Node {
   kind: NodeKind;
@@ -31,52 +39,77 @@ export interface Node {
   testOptions: Required<TestOptions>;
 
   /**
-   * Declares children and hooks of a describe block or a test, or a callback that is measured.
+   * Declares children and hooks of a describe block or a test. For a measure, this is the callback that is measured.
    */
   callback: () => unknown;
 }
 
 /**
- * A describe block or a test collected from a test file.
+ * A describe block or a test that a worker has collected from a test file. The main process prints blocks and runs
+ * each test in a new worker.
  */
 export type Block =
   | { kind: 'describe'; name: string; path: number[]; children: Block[]; errorMessage: string | null }
   | { kind: 'test'; name: string; path: number[] };
 
 /**
- * A job that a worker process runs after it imports setup files and the test file.
+ * A job that the main process sends to a new worker. The worker imports setup files and the test file, and then runs
+ * the job.
  */
 export type WorkerJob =
   | { type: 'collect_blocks'; setupFiles: string[]; testFile: string; testOptions: TestOptions }
   | { type: 'run_test'; setupFiles: string[]; testFile: string; testOptions: TestOptions; testPath: number[] };
 
+/**
+ * A message from a worker to the main process. The last message of a job is blocks_collected, test_ended or
+ * job_failed.
+ */
 export type WorkerEvent =
   | { type: 'blocks_collected'; blocks: Block[] }
   | { type: 'warmup_started'; measureIndex: number; measureCount: number }
   | { type: 'progress_updated'; measureIndex: number; measureCount: number; percentage: number }
   | { type: 'error_caught'; errorMessage: string }
   | { type: 'test_ended'; durationSnapshot: HistogramSnapshot; memorySnapshot: HistogramSnapshot }
-  | { type: 'file_failed'; errorMessage: string };
+  | { type: 'job_failed'; errorMessage: string };
 
 export interface MeasureResult {
   durationHistogram: Histogram;
   memoryHistogram: Histogram;
 }
 
+const defaultTestOptions: Required<TestOptions> = {
+  measureTimeout: 10_000,
+  targetRme: 0.05,
+  minBatchCount: 5,
+  maxWarmupBatchIterationCount: 10_000,
+  maxBatchIterationCount: Infinity,
+  batchTimeout: 1_000,
+  batchPauseDuration: 200,
+  minLoopDuration: 1,
+  maxBatchMemorySampleCount: 10,
+};
+
 /**
- * Returns test options with defaults applied. Throws if an option is unknown or invalid.
+ * Validates test options and fills in the options that aren't set. Throws if an option is unknown or invalid.
+ *
+ * @param testOptions The options to validate.
+ * @param parentTestOptions The options that fill in the options that aren't set.
  */
-export function toValidatedTestOptions(testOptions: TestOptions): Required<TestOptions> {
+export function toValidatedTestOptions(
+  testOptions: TestOptions,
+  parentTestOptions = defaultTestOptions
+): Required<TestOptions> {
+  // An option that is explicitly undefined is inherited too
   const {
-    measureTimeout = 10_000,
-    targetRme = 0.05,
-    minBatchCount = 5,
-    maxWarmupBatchIterationCount = 10_000,
-    maxBatchIterationCount = Infinity,
-    batchTimeout = 1_000,
-    batchPauseDuration = 200,
-    minLoopDuration = 1,
-    maxBatchMemorySampleCount = 10,
+    measureTimeout = parentTestOptions.measureTimeout,
+    targetRme = parentTestOptions.targetRme,
+    minBatchCount = parentTestOptions.minBatchCount,
+    maxWarmupBatchIterationCount = parentTestOptions.maxWarmupBatchIterationCount,
+    maxBatchIterationCount = parentTestOptions.maxBatchIterationCount,
+    batchTimeout = parentTestOptions.batchTimeout,
+    batchPauseDuration = parentTestOptions.batchPauseDuration,
+    minLoopDuration = parentTestOptions.minLoopDuration,
+    maxBatchMemorySampleCount = parentTestOptions.maxBatchMemorySampleCount,
     ...unknownOptions
   } = testOptions;
 
@@ -134,8 +167,8 @@ export function createTestSuite(testOptions: TestOptions): Node {
 }
 
 /**
- * Creates a node from inline options that aren't validated yet, and appends it to the parent. The node inherits test
- * options of the parent.
+ * Creates a node and appends it to the parent. Test options that the child doesn't set are inherited from the parent.
+ * Throws if test options are invalid.
  */
 export function appendNode(
   parent: Node,
@@ -146,10 +179,7 @@ export function appendNode(
     parent,
     children: [],
     hooks: [],
-    testOptions: toValidatedTestOptions({
-      ...parent.testOptions,
-      ...child.testOptions,
-    }),
+    testOptions: toValidatedTestOptions(child.testOptions, parent.testOptions),
   };
 
   parent.children.push(node);
@@ -157,11 +187,11 @@ export function appendNode(
 }
 
 /**
- * Calls callbacks of describe blocks to declare nested blocks, and returns blocks of the node. Test callbacks aren't
- * called.
+ * Returns describe blocks and tests that the node contains. Callbacks of describe blocks are called to declare their
+ * contents, and callbacks of tests aren't called.
  *
- * @param node The node which callback was already called.
- * @param path Indices of nodes from the test suite to the node.
+ * @param node A node whose callback was already called.
+ * @param path Indices of nodes on the way from the test suite to the node.
  */
 export async function collectBlocks(node: Node, path: number[] = []): Promise<Block[]> {
   const blocks: Block[] = [];
@@ -207,7 +237,7 @@ export interface RunTestParams {
   testSuite: Node;
 
   /**
-   * Indices of nodes from the test suite to the test.
+   * Indices of nodes on the way from the test suite to the test.
    */
   testPath: number[];
 
@@ -217,8 +247,8 @@ export interface RunTestParams {
 }
 
 /**
- * Runs a test. Only callbacks of describe blocks on the test path are called, so other blocks don't allocate memory in
- * the measured heap.
+ * Runs the test at the path. Only callbacks of describe blocks on the path are called, so other blocks don't add
+ * objects to the measured heap.
  */
 export async function runTest(params: RunTestParams): Promise<MeasureResult> {
   const { testSuite, testPath, getMemoryUsed, sendMessage } = params;
@@ -290,12 +320,11 @@ export interface RunMeasureParams {
 }
 
 /**
- * Warms up and measures a callback of a measure node. Returns null if the callback has thrown an error.
+ * Warms up the callback of a measure node, and then measures it. Returns null if the callback has thrown.
  *
- * A measure runs batches with a pause between them for garbage collection. A batch runs loops, and a loop times
- * iterations with a single pair of timer reads, so timer resolution and overhead don't distort the results. CPU
- * frequency and scheduling change between batches, so the mean iteration duration of a batch is a sample of the
- * reported statistics, and the measure runs until batches agree to the target relative margin of error.
+ * After warmup, the measure runs batches with a pause after each. A batch calls the callback in loops, and times each
+ * loop with two timer reads, so the overhead of the timer is spread over many calls. Each batch adds its mean call
+ * duration to the results. The measure stops when batches agree within targetRme, or when measureTimeout is reached.
  */
 export async function runMeasure(params: RunMeasureParams): Promise<MeasureResult | null> {
   const { node, measureIndex, measureCount, getMemoryUsed, sendMessage } = params;
@@ -323,16 +352,16 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   const durationHistogram = new Histogram();
   const memoryHistogram = new Histogram();
 
-  // Iteration hooks run around every iteration, so a loop has a single iteration if there are such hooks. Otherwise,
-  // loops of the first batch double until a loop lasts at least minLoopDuration.
+  // Iteration hooks run around every call, so then a loop has a single iteration. Otherwise, loops of the first batch
+  // double until a loop lasts at least minLoopDuration.
   let loopIterationCount = 1;
   let isLoopCalibrated = beforeIterationHooks.length !== 0 || afterIterationHooks.length !== 0;
 
   /**
-   * Runs iterations one by one until warmup is over. Returns false if the callback has thrown an error.
+   * Calls the callback one iteration at a time until warmup is over. Returns false if the callback has thrown.
    */
   async function runWarmupBatch(): Promise<boolean> {
-    // Warmup is a single batch, so it's also limited by batch options
+    // Warmup is a batch, so batch options limit it too
     const maxIterationCount = Math.min(maxWarmupBatchIterationCount, maxBatchIterationCount);
 
     await runHooks(beforeBatchHooks);
@@ -343,7 +372,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       for (let i = 0; i < maxIterationCount && performance.now() - batchTimestamp <= batchTimeout; ++i) {
         await runHooks(beforeIterationHooks);
 
-        callback();
+        assertSynchronous(callback());
 
         await runHooks(afterIterationHooks);
       }
@@ -362,10 +391,10 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   }
 
   /**
-   * Runs loops until the batch is over. Returns the mean iteration duration, or null if the callback has thrown an
-   * error.
+   * Runs loops until the batch is over. Returns the mean call duration, or `null` if the callback has thrown.
    *
-   * @param timeout The maximum duration of the batch in milliseconds. A batch times at least one loop.
+   * @param timeout The maximum duration of the batch in milliseconds. A batch times at least one loop, even if the loop
+   * takes longer.
    */
   async function runBatch(timeout: number): Promise<number | null> {
     let iterationCount = 0;
@@ -393,7 +422,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
 
         iterationCount += currentLoopIterationCount;
 
-        // A short loop isn't timed precisely, so it's discarded, unless the batch has no iterations left
+        // A loop that is too short to time precisely is discarded, unless the batch has no iterations left
         if (!isLoopCalibrated && loopDuration < minLoopDuration && iterationCount < maxBatchIterationCount) {
           loopIterationCount *= 2;
           continue;
@@ -425,7 +454,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   }
 
   /**
-   * Adds the memory allocated by an iteration to the memory histogram.
+   * Calls the callback once, and adds the number of bytes it has allocated to the memory histogram.
    */
   async function sampleMemoryUsed(): Promise<void> {
     await runHooks(beforeIterationHooks);
@@ -456,7 +485,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
 
     await runHooks(getReversedHookCallbacks(node, 'after_warmup'));
 
-    // The pause between batches is required for garbage collection
+    // The pause lets the garbage collector run before the first batch
     await sleep(batchPauseDuration);
   }
 
@@ -485,7 +514,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
     const { size, rme } = durationHistogram;
     const timeoutProgress = (performance.now() - measureTimestamp) / measureTimeout;
 
-    // The margin of error is 0 if all batches have the same mean iteration duration
+    // The margin of error is 0 if all batches have the same mean call duration
     const rmeProgress = size < minBatchCount ? 0 : rme === 0 ? 1 : targetRme / rme;
 
     if (timeoutProgress >= 1 || rmeProgress >= 1) {
@@ -521,36 +550,59 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
 }
 
 /**
- * Returns the duration of a loop in milliseconds.
+ * Calls the callback several times in a row, and returns how long all calls took in milliseconds.
  */
 function measureLoopDuration(callback: () => unknown, iterationCount: number): number {
+  let result;
+
   const timestamp = performance.now();
 
   for (let i = 0; i < iterationCount; ++i) {
-    callback();
+    result = callback();
   }
 
-  return performance.now() - timestamp;
+  const duration = performance.now() - timestamp;
+
+  // The first loop of a measure has a single iteration, so an async callback is detected after its first call
+  assertSynchronous(result);
+
+  return duration;
 }
 
 /**
- * Returns the number of bytes allocated by an iteration, or null if the measurement is distorted.
+ * Throws if a measured callback has returned a promise, since only the part of an async callback before its first
+ * await would be measured.
+ */
+function assertSynchronous(result: unknown): void {
+  if (!isPromiseLike(result)) {
+    return;
+  }
+
+  // The thrown error reports the problem, so a rejection of the promise must not crash the process
+  Promise.resolve(result).then(undefined, noop);
+
+  throw new Error('measure() callback must be synchronous');
+}
+
+/**
+ * Calls the callback once, and returns the number of bytes it has allocated, or null if the garbage collector has
+ * distorted the measurement.
  */
 function measureMemoryUsed(callback: () => unknown, getMemoryUsed: () => number): number | null {
-  // The heap probe can allocate memory itself, so the heap growth of a noop is subtracted
+  // Reading the heap size can allocate memory itself, so the heap growth around a noop is subtracted
   const probeMemoryUsed = measureHeapGrowth(noop, getMemoryUsed);
   const callbackMemoryUsed = measureHeapGrowth(callback, getMemoryUsed);
   const memoryUsed = callbackMemoryUsed - probeMemoryUsed;
 
-  // The heap shrinks if the garbage collector runs. The difference is negative if the probe allocated more memory while
-  // measuring the noop, which happens the first few times the probe runs.
+  // The heap shrinks if the garbage collector runs. The difference is also negative if the probe has allocated more
+  // memory around the noop, which happens the first few times the probe runs.
   return probeMemoryUsed < 0 || memoryUsed < 0 ? null : memoryUsed;
 }
 
 /**
- * Returns the heap growth during a call in bytes. A noop and a callback must be measured by this function, not by
- * inlined probes: V8 optimizes each call site of the probe differently, so probes at different call sites allocate
- * different amounts of memory.
+ * Returns how many bytes the heap has grown during a call. Both the noop and the callback must be measured by this
+ * function: V8 optimizes each call site separately, so heap reads at different call sites allocate different amounts
+ * of memory.
  */
 function measureHeapGrowth(callback: () => unknown, getMemoryUsed: () => number): number {
   const startMemoryUsed = getMemoryUsed();
@@ -561,16 +613,16 @@ function measureHeapGrowth(callback: () => unknown, getMemoryUsed: () => number)
 }
 
 /**
- * Returns callbacks of hooks of the given type that are registered on the node and its ancestors: from the outermost
- * block to the innermost, in the order of registration. Before-hooks run in this order.
+ * Returns callbacks of hooks of the type that are registered on the node and its ancestors, in the order before-hooks
+ * run: outer blocks first, and hooks of the same block in the order they were registered.
  */
 function getHookCallbacks(node: Node, type: HookType): HookCallback[] {
   return getReversedHookCallbacks(node, type).reverse();
 }
 
 /**
- * Returns callbacks of hooks of the given type that are registered on the node and its ancestors: from the innermost
- * block to the outermost, the last registered first. After-hooks run in this order.
+ * Returns callbacks of hooks of the type that are registered on the node and its ancestors, in the order after-hooks
+ * run: inner blocks first, and hooks of the same block in reverse order of registration.
  */
 function getReversedHookCallbacks(node: Node, type: HookType): HookCallback[] {
   const callbacks: HookCallback[] = [];
@@ -595,7 +647,7 @@ async function runHooks(callbacks: HookCallback[]): Promise<void> {
 let currentNode = createTestSuite({});
 
 /**
- * Returns the node to which describe blocks, tests, measures and hooks are added.
+ * Returns the node to which describe blocks, tests, measures and hooks are added when they are declared.
  */
 export function getCurrentNode(): Node {
   return currentNode;

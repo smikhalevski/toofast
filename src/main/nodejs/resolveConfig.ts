@@ -15,7 +15,7 @@ const TEST_FILE_PATTERNS = ['**/*.perf.{js,mjs,ts,mts}'];
 const EXCLUDE_PATTERNS = ['**/node_modules/**'];
 
 /**
- * Parsed config consumed by the runner.
+ * The config of a run, resolved from command line arguments and the config file.
  */
 export interface Config {
   /**
@@ -29,12 +29,13 @@ export interface Config {
   testFiles: string[];
 
   /**
-   * Patterns of names of tests that are run. A test name is prefixed with names of enclosing describe blocks.
+   * Patterns of names of tests to run. If empty, all tests run. A test name is prefixed with names of enclosing describe
+   * blocks, separated by dots.
    */
   testNamePatterns: RegExp[];
 
   /**
-   * Test options from the config file, with defaults applied.
+   * Test options from the config file, with defaults for options that aren't set.
    */
   testOptions: Required<TestOptions>;
 }
@@ -57,8 +58,8 @@ const defaultConfig: Required<UserConfig> = {
 /**
  * Parses command line arguments and reads the config file.
  *
- * @param args Command line arguments without the Node.js executable and the script paths.
- * @param cwd The directory relative to which the config file is resolved.
+ * @param args Command line arguments without the paths of the Node.js executable and the script.
+ * @param cwd The directory that the path of the config file is relative to.
  */
 export function resolveConfig(args = process.argv.slice(2), cwd = process.cwd()): Config {
   const { values, positionals } = parseArgs({
@@ -89,7 +90,7 @@ export function resolveConfig(args = process.argv.slice(2), cwd = process.cwd())
  * Reads a config file and checks its structure. Test options are validated separately.
  *
  * @param configFile The absolute path of the config file.
- * @param configPath The path of the config file that is shown in error messages.
+ * @param configPath The path of the config file to show in error messages.
  */
 function readConfigFile(configFile: string, configPath: string): Required<UserConfig> {
   assert(fs.existsSync(configFile), "Config file doesn't exist: " + configPath);
@@ -116,7 +117,11 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   assert(isObject(testOptions), 'testOptions must be an object');
 
-  return { setupFilePatterns, testFilePatterns, testOptions };
+  return {
+    setupFilePatterns,
+    testFilePatterns,
+    testOptions,
+  };
 }
 
 function parseConfig(json: string, configPath: string): unknown {

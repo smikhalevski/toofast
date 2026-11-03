@@ -21,7 +21,7 @@
     "clean": "rimraf lib docs coverage",
     "test": "vitest run",
     "lint": "oxlint --tsconfig tsconfig.json src/main",
-    "format": "oxfmt 'src/**/*.{ts,js,json}'",
+    "format": "oxfmt 'src/**/*.{ts,js,json,md}'",
     "docs": "typedoc"
   },
   "repository": {

@@ -1,9 +1,17 @@
 import path from 'path';
 import { describe, expect, test } from 'vitest';
 import { resolveConfig } from '../../main/nodejs/resolveConfig.ts';
-import { makeTestDirectory } from './test-utils.ts';
+import { makeTestDirectory } from '../test-utils.ts';
 
 describe('resolveConfig', () => {
+  test('accepts $schema in a config file', () => {
+    const directory = makeTestDirectory({
+      'toofast.json': JSON.stringify({ $schema: './node_modules/toofast/config_schema.json' }),
+    });
+
+    expect(() => resolveConfig([], directory)).not.toThrow();
+  });
+
   test('accepts 0 warmup iterations in a config file', () => {
     const directory = makeTestDirectory({
       'toofast.json': JSON.stringify({ testOptions: { maxWarmupBatchIterationCount: 0 } }),
@@ -56,7 +64,7 @@ describe('resolveConfig', () => {
   test('throws if a config file from arguments does not exist', () => {
     const directory = makeTestDirectory({});
 
-    expect(() => resolveConfig(['--config', 'aaa.json'], directory)).toThrow("Config file aaa.json doesn't exist");
+    expect(() => resolveConfig(['--config', 'aaa.json'], directory)).toThrow("Config file doesn't exist: aaa.json");
   });
 
   test('throws if a config file is not valid JSON', () => {
@@ -64,7 +72,7 @@ describe('resolveConfig', () => {
       'toofast.json': '{',
     });
 
-    expect(() => resolveConfig([], directory)).toThrow("Config file toofast.json isn't valid JSON");
+    expect(() => resolveConfig([], directory)).toThrow('Cannot parse config: toofast.json');
   });
 
   test('throws if a config file does not contain an object', () => {
@@ -72,7 +80,7 @@ describe('resolveConfig', () => {
       'toofast.json': '[]',
     });
 
-    expect(() => resolveConfig([], directory)).toThrow('Config file toofast.json must contain an object');
+    expect(() => resolveConfig([], directory)).toThrow('Config file must export an object: toofast.json');
   });
 
   test('throws if a config file has an unknown option', () => {
@@ -80,15 +88,31 @@ describe('resolveConfig', () => {
       'toofast.json': JSON.stringify({ aaa: 111 }),
     });
 
-    expect(() => resolveConfig([], directory)).toThrow('Config file toofast.json has an unknown option: aaa');
+    expect(() => resolveConfig([], directory)).toThrow('Unknown config option:aaa');
   });
 
-  test('throws if a config file has patterns that are not strings', () => {
+  test('throws if a config file has test file patterns that are not strings', () => {
     const directory = makeTestDirectory({
       'toofast.json': JSON.stringify({ testFilePatterns: ['aaa', 111] }),
     });
 
-    expect(() => resolveConfig([], directory)).toThrow('testFilePatterns in toofast.json must be an array of strings');
+    expect(() => resolveConfig([], directory)).toThrow('testFilePatterns must be an array of strings');
+  });
+
+  test('throws if a config file has setup file patterns that are not strings', () => {
+    const directory = makeTestDirectory({
+      'toofast.json': JSON.stringify({ setupFilePatterns: [111] }),
+    });
+
+    expect(() => resolveConfig([], directory)).toThrow('setupFilePatterns must be an array of strings');
+  });
+
+  test('throws if test options in a config file are not an object', () => {
+    const directory = makeTestDirectory({
+      'toofast.json': JSON.stringify({ testOptions: 111 }),
+    });
+
+    expect(() => resolveConfig([], directory)).toThrow('testOptions must be an object');
   });
 
   test('throws if a test option in a config file is a string', () => {

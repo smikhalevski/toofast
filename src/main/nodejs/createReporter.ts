@@ -22,6 +22,7 @@ const STYLE_ERROR_SYMBOL: Style = 'red';
 const STYLE_ERROR_MESSAGE: Style = 'red';
 const STYLE_NUMBER_INTEGER: Style = 'yellow';
 const STYLE_NUMBER_FRACTION: Style = ['dim', 'yellow'];
+const STYLE_NOT_AVAILABLE: Style = 'dim';
 const STYLE_RME: Style = 'dim';
 
 export interface Reporter {
@@ -31,7 +32,7 @@ export interface Reporter {
   printDescribeStart(name: string): void;
 
   /**
-   * Ends the describe block that was started last.
+   * Removes the indent of the describe block that was started last.
    */
   printDescribeEnd(): void;
 
@@ -48,7 +49,7 @@ export interface Reporter {
   printTestEvent(event: WorkerEvent): void;
 
   /**
-   * Prints an error that isn't caused by a test, for example, an error thrown by a describe block.
+   * Prints an error that doesn't belong to a test, for example, an error thrown by a describe block or a test file.
    */
   printError(errorMessage: string): void;
 }
@@ -56,8 +57,8 @@ export interface Reporter {
 /**
  * Creates a reporter that prints test results.
  *
- * @param stream The stream to print to. Status lines are redrawn in place, so they are printed only if the stream is a
- * TTY. Colors are used if the stream supports them.
+ * @param stream The stream to print to. Progress is redrawn in place, so it's printed only if the stream is a TTY.
+ * Colors are used if the stream supports them.
  */
 export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean } = process.stdout): Reporter {
   const isTTY = stream.isTTY === true;
@@ -135,6 +136,18 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
     return applyStyle(STYLE_RME, ' ± ' + rmeLabel.padEnd(6));
   }
 
+  /**
+   * Formats a value and its margin of error, or n/a if nothing was measured.
+   */
+  function formatStats(histogram: Histogram, value: number, unit: string): string {
+    if (histogram.size === 0) {
+      // A value that wasn't measured isn't shown as zero, and the column keeps its width
+      return applyStyle(STYLE_NOT_AVAILABLE, 'n/a'.padStart(5)) + ' '.repeat(unit.length + 11);
+    }
+
+    return formatMeasurement(value, unit) + formatRme(histogram);
+  }
+
   return {
     printDescribeStart(name) {
       print('\n' + PADDING.repeat(depth) + applyStyle(STYLE_DESCRIBE, name) + '\n');
@@ -200,11 +213,9 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
                 : applyStyle(STYLE_SUCCESS_SYMBOL, SYMBOL_SUCCESS + ' ')) +
               testName +
               PADDING +
-              formatMeasurement(durationHistogram.hz, 'Hz') +
-              formatRme(durationHistogram) +
+              formatStats(durationHistogram, durationHistogram.hz, 'Hz') +
               PADDING +
-              formatMeasurement(memoryHistogram.mean, 'B') +
-              formatRme(memoryHistogram) +
+              formatStats(memoryHistogram, memoryHistogram.mean, 'B') +
               '\n'
           );
 

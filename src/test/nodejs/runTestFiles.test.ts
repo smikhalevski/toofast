@@ -1,20 +1,23 @@
-import { execFileSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { beforeAll, describe, expect, test } from 'vitest';
-import { makeTestDirectory } from './test-utils.ts';
+import { describe, expect, test } from 'vitest';
+import { makeTestDirectory } from '../test-utils.ts';
 
-const cliPath = path.resolve('lib/nodejs/cli.ts');
+const cliPath = path.resolve('lib/nodejs/cli.js');
 
 // Test files import the package that is built before tests
-const importToofast = `import { describe, test } from ${JSON.stringify(pathToFileURL(path.resolve('lib/index.ts')).href)};\n`;
+const importToofast = `import { beforeWarmup, describe, measure, test } from ${JSON.stringify(pathToFileURL(path.resolve('lib/index.js')).href)};\n`;
 
-beforeAll(() => {
-  execFileSync(process.execPath, [path.resolve('node_modules/typescript/bin/tsc'), '--project', 'tsconfig.build.json']);
-}, 60_000);
+// Colors must depend only on streams, and not on the environment of the test run
+const env = { ...process.env };
+
+delete env.FORCE_COLOR;
+delete env.NO_COLOR;
+delete env.NODE_DISABLE_COLORS;
 
 function runToofast(cwd: string, args: string[] = [], nodeOptions: string[] = []) {
-  return spawnSync(process.execPath, [...nodeOptions, cliPath, ...args], { cwd, encoding: 'utf8' });
+  return spawnSync(process.execPath, [...nodeOptions, cliPath, ...args], { cwd, env, encoding: 'utf8' });
 }
 
 describe('runTestFiles', () => {
@@ -30,15 +33,24 @@ describe('runTestFiles', () => {
       'toofast.json': JSON.stringify({ testFilePatterns: ['aaa.perf.ts', 'fff.perf.ts'] }),
     });
 
-    expect(runToofast(directory).status).toBe(1);
+    const result = runToofast(directory);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('✗ ccc');
+    expect(result.stdout).toContain('✓ eee');
+    expect(result.stdout).toContain('✓ ggg');
   });
 
-  test('exits with 1 if a describe block throws', () => {
+  test('reports an error thrown by a describe block and runs other tests', () => {
     const directory = makeTestDirectory({
-      'aaa.perf.ts': importToofast + "describe('bbb', () => { throw new Error('expected'); });",
+      'aaa.perf.ts': importToofast + "describe('bbb', () => { throw new Error('expected'); }); test('ccc', () => {});",
     });
 
-    expect(runToofast(directory).status).toBe(1);
+    const result = runToofast(directory);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('bbb\nError: expected');
+    expect(result.stdout).toContain('✓ ccc');
   });
 
   test('exits with 1 if a test file throws', () => {
@@ -49,7 +61,7 @@ describe('runTestFiles', () => {
     expect(runToofast(directory).status).toBe(1);
   });
 
-  test('prints an error thrown by a test file', () => {
+  test('prints an error thrown by a test file after the path of the file', () => {
     const directory = makeTestDirectory({
       'aaa.perf.ts': "throw new Error('expected');",
     });
@@ -57,12 +69,88 @@ describe('runTestFiles', () => {
     expect(runToofast(directory).stdout).toContain('Error: expected');
   });
 
-  test('exits with 1 if a test process exits unexpectedly', () => {
+  test('runs other test files if a test file throws', () => {
     const directory = makeTestDirectory({
-      'aaa.perf.ts': importToofast + "test('bbb', () => { process.exit(0); });",
+      'aaa.perf.ts': "throw new Error('expected');",
+      'bbb.perf.ts': importToofast + "test('ccc', () => {});",
+      'toofast.json': JSON.stringify({ testFilePatterns: ['aaa.perf.ts', 'bbb.perf.ts'] }),
     });
 
-    expect(runToofast(directory).status).toBe(1);
+    expect(runToofast(directory).stdout).toContain('✓ ccc');
+  });
+
+  test('reports a test process that exits unexpectedly and runs other tests', () => {
+    const directory = makeTestDirectory({
+      'aaa.perf.ts': importToofast + "test('bbb', () => { process.exit(0); }); test('ccc', () => {});",
+    });
+
+    const result = runToofast(directory);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('✗ bbb');
+    expect(result.stdout).toContain('Test process exited unexpectedly: 0');
+    expect(result.stdout).toContain('✓ ccc');
+  });
+
+  test('reports an error that escapes a test', () => {
+    const directory = makeTestDirectory({
+      'aaa.perf.ts':
+        importToofast +
+        "test('bbb', async () => { setTimeout(() => { throw new Error('expected'); }); await new Promise(resolve => setTimeout(resolve, 100)); });",
+    });
+
+    const result = runToofast(directory);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('✗ bbb');
+    expect(result.stdout).toContain('Error: expected');
+  });
+
+  test('exits with 1 if no tests are found', () => {
+    const directory = makeTestDirectory({
+      'aaa.perf.ts': importToofast + "test('bbb', () => {});",
+    });
+
+    // For example, a test name pattern has a typo
+    const result = runToofast(directory, ['ccc']);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('No tests found');
+  });
+
+  test('runs each test in a separate process', () => {
+    const directory = makeTestDirectory({
+      'aaa.perf.ts':
+        importToofast +
+        "test('bbb', () => { globalThis.isTouched = true; });" +
+        "test('ccc', () => { if (globalThis.isTouched === true) { throw new Error('unexpected'); } });",
+    });
+
+    expect(runToofast(directory).status).toBe(0);
+  });
+
+  test('imports setup files before test files', () => {
+    const directory = makeTestDirectory({
+      'aaa.ts': 'globalThis.isSetUp = true;',
+      'bbb.perf.ts':
+        importToofast + "if (globalThis.isSetUp !== true) { throw new Error('unexpected'); } test('ccc', () => {});",
+      'toofast.json': JSON.stringify({ setupFilePatterns: ['aaa.ts'] }),
+    });
+
+    expect(runToofast(directory).status).toBe(0);
+  });
+
+  test('passes test options from the config file to tests', () => {
+    const directory = makeTestDirectory({
+      'aaa.perf.ts':
+        importToofast +
+        "test('bbb', () => { beforeWarmup(() => { throw new Error('unexpected'); }); measure({ measureTimeout: 10, batchTimeout: 1, batchPauseDuration: 1 }, () => {}); });",
+
+      // Warmup hooks don't run if warmup is disabled
+      'toofast.json': JSON.stringify({ testOptions: { maxWarmupBatchIterationCount: 0 } }),
+    });
+
+    expect(runToofast(directory).status).toBe(0);
   });
 
   test('imports test files from a directory with # in its name', () => {
@@ -109,7 +197,10 @@ describe('runTestFiles', () => {
     });
 
     // Test processes would fail to listen on the same port, which is reported but doesn't fail the run
-    expect(runToofast(directory, [], ['--inspect=9229']).stderr).not.toContain('address already in use');
+    const result = runToofast(directory, [], ['--inspect=9229']);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('address already in use');
   });
 
   test('strips types in test processes if the main process does not', () => {

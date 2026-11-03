@@ -1,5 +1,5 @@
 /**
- * A snapshot of a histogram, from which all statistics are computed. A worker process sends it to the main process.
+ * The state of a histogram, from which all of its statistics are computed. Workers send snapshots to the main process.
  */
 export interface HistogramSnapshot {
   /**
@@ -18,6 +18,12 @@ export interface HistogramSnapshot {
   sumOfSquaredDeviations: number;
 }
 
+export const emptyHistogramSnapshot: HistogramSnapshot = Object.freeze({
+  size: 0,
+  mean: 0,
+  sumOfSquaredDeviations: 0,
+});
+
 /**
  * Accumulates values of a sample and computes statistics without storing the values. Uses Welford's online algorithm,
  * which is numerically stable and never produces a negative variance.
@@ -30,10 +36,10 @@ export class Histogram {
   private _sumOfSquaredDeviations: number;
 
   /**
-   * Creates an empty histogram, or restores a histogram from its snapshot, for example, after the snapshot was sent
-   * from another process.
+   * Creates an empty histogram, or restores a histogram from a snapshot, for example, from a snapshot that another
+   * process has sent.
    */
-  constructor(snapshot: HistogramSnapshot = { size: 0, mean: 0, sumOfSquaredDeviations: 0 }) {
+  constructor(snapshot = emptyHistogramSnapshot) {
     this._size = snapshot.size;
     this._mean = snapshot.mean;
     this._sumOfSquaredDeviations = snapshot.sumOfSquaredDeviations;
@@ -139,7 +145,7 @@ export class Histogram {
   }
 
   /**
-   * Returns the snapshot that restores the histogram with the constructor.
+   * Returns a snapshot from which the constructor can restore the histogram.
    */
   getSnapshot(): HistogramSnapshot {
     return { size: this._size, mean: this._mean, sumOfSquaredDeviations: this._sumOfSquaredDeviations };

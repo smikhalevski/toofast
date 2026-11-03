@@ -1,4 +1,4 @@
-import { describe, test, measure } from '../main/index.ts';
+import { describe, test, measure } from '../../lib/index.js';
 
 function factorial(x: number): number {
   return x === 0 ? 1 : x * factorial(x - 1);
