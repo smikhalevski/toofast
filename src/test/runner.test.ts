@@ -373,9 +373,11 @@ describe('runTest', () => {
     });
 
     // Each batch of each measure adds a sample
-    expect(result.durationHistogram.size).toBe(batchCounts[0] + batchCounts[1]);
-    expect(result.memoryHistogram.mean).toBeGreaterThan(222);
-    expect(result.memoryHistogram.mean).toBeLessThan(444);
+    expect(result.durationSummary.size).toBe(batchCounts[0] + batchCounts[1]);
+
+    // Measures have equal weights, and the difference between callbacks isn't an error
+    expect(result.memorySummary.mean).toBe(333);
+    expect(result.memorySummary.rme).toBe(0);
   });
 });
 
@@ -779,6 +781,28 @@ describe('runMeasure', () => {
     await measureNode(node);
 
     expect(batchCount).toBeGreaterThanOrEqual(7);
+  });
+
+  test('does not stop after a single batch if minBatchCount is 1', async () => {
+    let batchCount = 0;
+
+    // The margin of error of a single batch is unknown, and any margin of error below 99% stops the measure
+    const node = makeTestMeasure(
+      {
+        ...fastOptions,
+        measureTimeout: 10_000,
+        targetRme: 0.99,
+        minBatchCount: 1,
+        maxBatchIterationCount: 1,
+        beforeBatch: () => void batchCount++,
+      },
+      () => busyWait(5)
+    );
+
+    await measureNode(node);
+
+    expect(batchCount).toBeGreaterThanOrEqual(2);
+    expect(getProgressPercentages()).not.toContainEqual(NaN);
   });
 
   test('stops after the margin of error reaches the target', async () => {

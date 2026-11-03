@@ -1,49 +1,41 @@
 /**
- * The state of a histogram, from which all of its statistics are computed. Workers send snapshots to the main process.
+ * The mean of values in histograms with its margin of error, for example, the result of a test. Workers send summaries
+ * to the main process.
  */
-export interface HistogramSnapshot {
+export interface HistogramSummary {
   /**
-   * The number of values in the sample.
+   * The number of values, or `0` if nothing was measured.
    */
   size: number;
 
   /**
-   * The arithmetic mean of values.
+   * The estimated mean.
    */
   mean: number;
 
   /**
-   * The sum of squared deviations of values from the mean.
+   * The margin of error relative to the mean at 95% confidence, or `NaN` if it's unknown, for example, if nothing was
+   * measured or a histogram has a single value.
    */
-  sumOfSquaredDeviations: number;
+  rme: number;
 }
 
-export const emptyHistogramSnapshot: HistogramSnapshot = Object.freeze({
+export const emptyHistogramSummary: HistogramSummary = Object.freeze({
   size: 0,
   mean: 0,
-  sumOfSquaredDeviations: 0,
+  rme: NaN,
 });
 
 /**
  * Accumulates values of a sample and computes statistics without storing the values. Uses Welford's online algorithm,
  * which is numerically stable and never produces a negative variance.
  *
- * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm Welford's online algorithm}
+ * @see [Welford's online algorithm](https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm)
  */
 export class Histogram {
-  private _size: number;
-  private _mean: number;
-  private _sumOfSquaredDeviations: number;
-
-  /**
-   * Creates an empty histogram, or restores a histogram from a snapshot, for example, from a snapshot that another
-   * process has sent.
-   */
-  constructor(snapshot = emptyHistogramSnapshot) {
-    this._size = snapshot.size;
-    this._mean = snapshot.mean;
-    this._sumOfSquaredDeviations = snapshot.sumOfSquaredDeviations;
-  }
+  private _size = 0;
+  private _mean = 0;
+  private _sumOfSquaredDeviations = 0;
 
   /**
    * The number of values in the sample.
@@ -60,56 +52,52 @@ export class Histogram {
   }
 
   /**
-   * The unbiased sample variance. The sum of squared deviations from the mean is divided by size - 1, because the mean
-   * is estimated from the same sample.
+   * The unbiased sample variance. The sum of squared deviations from the mean is divided by {@link size} - 1, because
+   * the mean is estimated from the same sample.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
+   * `NaN` if there are less than two values, since a single value doesn't show how much values vary.
+   *
+   * @see [Variance](https://en.wikipedia.org/wiki/Variance)
    */
   get variance(): number {
-    return this.size < 2 ? 0 : this._sumOfSquaredDeviations / (this.size - 1);
+    return this._size < 2 ? NaN : this._sumOfSquaredDeviations / (this._size - 1);
   }
 
   /**
-   * The standard deviation, the square root of {@link variance}.
+   * The standard deviation, the square root of {@link variance}, or `NaN` if there are less than two values.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
+   * @see [Standard deviation](https://en.wikipedia.org/wiki/Standard_deviation)
    */
   get sd(): number {
     return Math.sqrt(this.variance);
   }
 
   /**
-   * The standard error of the mean, {@link sd} divided by the square root of {@link size}.
+   * The standard error of the mean, {@link sd} divided by the square root of {@link size}, or `NaN` if there are less
+   * than two values.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
+   * @see [Standard error](https://en.wikipedia.org/wiki/Standard_error)
    */
   get sem(): number {
-    return this.size === 0 ? 0 : this.sd / Math.sqrt(this.size);
+    return this.sd / Math.sqrt(this._size);
   }
 
   /**
    * The margin of error of the mean at 95% confidence, {@link sem} multiplied by the critical value of the
-   * t-distribution.
+   * t-distribution, or `NaN` if there are less than two values.
    *
-   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
+   * @see [Margin of error](https://en.wikipedia.org/wiki/Margin_of_error)
    */
   get moe(): number {
-    return this.size < 2 ? 0 : this.sem * getCriticalValue(this.size - 1);
+    return this.sem * getCriticalValue(this._size - 1);
   }
 
   /**
-   * The margin of error relative to the mean, for example, 0.05 for ±5%.
+   * The margin of error relative to the mean, for example, `0.05` for ±5%, or `NaN` if there are less than two values.
    */
   get rme(): number {
-    // The mean is 0 if all values are 0, so there's no error
-    return this.mean === 0 ? 0 : this.moe / this.mean;
-  }
-
-  /**
-   * The number of iterations per second, if values are iteration durations in milliseconds.
-   */
-  get hz(): number {
-    return this.size === 0 ? 0 : 1000 / this.mean;
+    // All values are equal, so there's no error, even if the mean is 0
+    return this.moe === 0 ? 0 : this.moe / this.mean;
   }
 
   /**
@@ -124,40 +112,78 @@ export class Histogram {
     // The deviation from the previous mean is multiplied by the deviation from the updated mean
     this._sumOfSquaredDeviations += delta * (value - this._mean);
   }
-
-  /**
-   * Adds all values of another histogram to the sample.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm}
-   */
-  merge(histogram: Histogram): void {
-    if (histogram._size === 0) {
-      return;
-    }
-
-    const size = this._size + histogram._size;
-    const delta = histogram._mean - this._mean;
-
-    this._mean += (delta * histogram._size) / size;
-    this._sumOfSquaredDeviations +=
-      histogram._sumOfSquaredDeviations + (delta * delta * this._size * histogram._size) / size;
-    this._size = size;
-  }
-
-  /**
-   * Returns a snapshot from which the constructor can restore the histogram.
-   */
-  getSnapshot(): HistogramSnapshot {
-    return { size: this._size, mean: this._mean, sumOfSquaredDeviations: this._sumOfSquaredDeviations };
-  }
 }
 
 /**
- * Returns the two-tailed critical value of the t-distribution at 95% confidence.
+ * Summarizes histograms of measures of different callbacks, for example, into the result of a test.
+ * {@link HistogramSummary.mean} is the mean of means of histograms. Histograms without values are skipped.
+ *
+ * Histograms have equal weights, since a noisy measure runs more batches but must not outweigh others. The gap between
+ * means is the difference between callbacks, so only the noise within histograms adds to the margin of error. Don't
+ * summarize histograms of the same callback this way: then the gap is noise too.
+ *
+ * {@link HistogramSummary.rme} is `NaN` if nothing was measured or a histogram has a single value.
+ *
+ * @see [Welch–Satterthwaite equation](https://en.wikipedia.org/wiki/Welch%E2%80%93Satterthwaite_equation)
+ */
+export function summarizeHistograms(histograms: readonly Histogram[]): HistogramSummary {
+  let histogramCount = 0;
+  let size = 0;
+  let sumOfMeans = 0;
+  let sumOfSquaredSems = 0;
+  let welchDenominator = 0;
+
+  for (const histogram of histograms) {
+    // For example, the memory histogram of a measure that doesn't sample memory
+    if (histogram.size === 0) {
+      continue;
+    }
+
+    // NaN if the histogram has a single value, which makes the margin of error unknown
+    const squaredSem = histogram.sem ** 2;
+
+    histogramCount++;
+    size += histogram.size;
+    sumOfMeans += histogram.mean;
+    sumOfSquaredSems += squaredSem;
+    welchDenominator += squaredSem ** 2 / (histogram.size - 1);
+  }
+
+  if (histogramCount === 0) {
+    return emptyHistogramSummary;
+  }
+
+  const mean = sumOfMeans / histogramCount;
+
+  // Values within each histogram are equal, so there's no error
+  if (sumOfSquaredSems === 0) {
+    return {
+      size,
+      mean,
+      rme: 0,
+    };
+  }
+
+  // Welch–Satterthwaite equation. Rounding to an integer also absorbs rounding errors, such as 6.999… for 7.
+  const degreesOfFreedom = Math.round(sumOfSquaredSems ** 2 / welchDenominator);
+  const moe = (Math.sqrt(sumOfSquaredSems) / histogramCount) * getCriticalValue(degreesOfFreedom);
+
+  return {
+    size,
+    mean,
+    rme: moe / mean,
+  };
+}
+
+/**
+ * Returns the two-tailed critical value of the t-distribution at 95% confidence, or `NaN` if there are no degrees of
+ * freedom.
+ *
+ * @param degreesOfFreedom An integer.
  */
 function getCriticalValue(degreesOfFreedom: number): number {
   // Beyond the table, values decrease slowly from 1.98 to 1.96, so the last value is used
-  return tTable[Math.min(degreesOfFreedom, tTable.length) - 1];
+  return tTable[Math.min(degreesOfFreedom, tTable.length) - 1] ?? NaN;
 }
 
 /**

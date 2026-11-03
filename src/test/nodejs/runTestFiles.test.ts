@@ -106,6 +106,17 @@ describe('runTestFiles', () => {
     expect(result.stdout).toContain('Error: expected');
   });
 
+  test('prints n/a if the margin of error is unknown', () => {
+    const directory = makeTestDirectory({
+      // Each measure times out after its first batch
+      'aaa.perf.ts':
+        importToofast +
+        "test('bbb', { measureTimeout: 1, maxWarmupBatchIterationCount: 0 }, () => { measure(() => {}); measure(() => {}); });",
+    });
+
+    expect(runToofast(directory).stdout).toMatch(/Hz +± n\/a/);
+  });
+
   test('exits with 1 if no tests are found', () => {
     const directory = makeTestDirectory({
       'aaa.perf.ts': importToofast + "test('bbb', () => {});",

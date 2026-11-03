@@ -109,7 +109,7 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   const unknownOptionNames = Object.keys(unknownOptions);
 
-  assert(unknownOptionNames.length === 0, 'Unknown config option:' + unknownOptionNames[0]);
+  assert(unknownOptionNames.length === 0, 'Unknown config option: ' + unknownOptionNames[0]);
 
   assert(isArrayOf(setupFilePatterns, isString), 'setupFilePatterns must be an array of strings');
 

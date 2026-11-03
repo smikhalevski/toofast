@@ -40,7 +40,7 @@ async function runJob(job: WorkerJob): Promise<WorkerEvent> {
     };
   }
 
-  const { durationHistogram, memoryHistogram } = await runTest({
+  const { durationSummary, memorySummary } = await runTest({
     testSuite,
     testPath: job.testPath,
     getMemoryUsed,
@@ -49,8 +49,8 @@ async function runJob(job: WorkerJob): Promise<WorkerEvent> {
 
   return {
     type: 'test_ended',
-    durationSnapshot: durationHistogram.getSnapshot(),
-    memorySnapshot: memoryHistogram.getSnapshot(),
+    durationSummary,
+    memorySummary,
   };
 }
 

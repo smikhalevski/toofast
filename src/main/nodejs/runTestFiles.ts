@@ -1,6 +1,6 @@
 import { fork } from 'child_process';
 import path from 'path';
-import { emptyHistogramSnapshot } from '../Histogram.ts';
+import { emptyHistogramSummary } from '../Histogram.ts';
 import type { TestOptions } from '../index.ts';
 import type { Block, WorkerEvent, WorkerJob } from '../runner.ts';
 import { getErrorMessage } from '../utils.ts';
@@ -128,8 +128,8 @@ async function runBlocks(params: RunBlocksParams): Promise<number> {
 
       reporter.printTestEvent({
         type: 'test_ended',
-        durationSnapshot: emptyHistogramSnapshot,
-        memorySnapshot: emptyHistogramSnapshot,
+        durationSummary: emptyHistogramSummary,
+        memorySummary: emptyHistogramSummary,
       });
 
       errorCount++;

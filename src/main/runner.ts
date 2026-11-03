@@ -1,4 +1,4 @@
-import { Histogram, type HistogramSnapshot } from './Histogram.ts';
+import { Histogram, type HistogramSummary, summarizeHistograms } from './Histogram.ts';
 import type { HookCallback, TestOptions } from './index.ts';
 import {
   assert,
@@ -69,12 +69,17 @@ export type WorkerEvent =
   | { type: 'warmup_started'; measureIndex: number; measureCount: number }
   | { type: 'progress_updated'; measureIndex: number; measureCount: number; percentage: number }
   | { type: 'error_caught'; errorMessage: string }
-  | { type: 'test_ended'; durationSnapshot: HistogramSnapshot; memorySnapshot: HistogramSnapshot }
+  | { type: 'test_ended'; durationSummary: HistogramSummary; memorySummary: HistogramSummary }
   | { type: 'job_failed'; errorMessage: string };
 
 export interface MeasureResult {
   durationHistogram: Histogram;
   memoryHistogram: Histogram;
+}
+
+export interface TestResult {
+  durationSummary: HistogramSummary;
+  memorySummary: HistogramSummary;
 }
 
 const defaultTestOptions: Required<TestOptions> = {
@@ -249,12 +254,14 @@ export interface RunTestParams {
 /**
  * Runs the test at the path. Only callbacks of describe blocks on the path are called, so other blocks don't add
  * objects to the measured heap.
+ *
+ * Histograms of measures are summarized into the result of the test, see {@link summarizeHistograms}.
  */
-export async function runTest(params: RunTestParams): Promise<MeasureResult> {
+export async function runTest(params: RunTestParams): Promise<TestResult> {
   const { testSuite, testPath, getMemoryUsed, sendMessage } = params;
 
-  const durationHistogram = new Histogram();
-  const memoryHistogram = new Histogram();
+  const durationHistograms: Histogram[] = [];
+  const memoryHistograms: Histogram[] = [];
 
   let node = testSuite;
 
@@ -285,8 +292,8 @@ export async function runTest(params: RunTestParams): Promise<MeasureResult> {
       });
 
       if (result !== null) {
-        durationHistogram.merge(result.durationHistogram);
-        memoryHistogram.merge(result.memoryHistogram);
+        durationHistograms.push(result.durationHistogram);
+        memoryHistograms.push(result.memoryHistogram);
       }
     }
   } catch (error) {
@@ -306,7 +313,10 @@ export async function runTest(params: RunTestParams): Promise<MeasureResult> {
     });
   }
 
-  return { durationHistogram, memoryHistogram };
+  return {
+    durationSummary: summarizeHistograms(durationHistograms),
+    memorySummary: summarizeHistograms(memoryHistograms),
+  };
 }
 
 export interface RunMeasureParams {
@@ -514,8 +524,8 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
     const { size, rme } = durationHistogram;
     const timeoutProgress = (performance.now() - measureTimestamp) / measureTimeout;
 
-    // The margin of error is 0 if all batches have the same mean call duration
-    const rmeProgress = size < minBatchCount ? 0 : rme === 0 ? 1 : targetRme / rme;
+    // The margin of error is unknown for a single batch, and is 0 if all batches have the same mean call duration
+    const rmeProgress = size < minBatchCount || Number.isNaN(rme) ? 0 : rme === 0 ? 1 : targetRme / rme;
 
     if (timeoutProgress >= 1 || rmeProgress >= 1) {
       sendMessage({

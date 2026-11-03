@@ -10,6 +10,7 @@ The Node.js performance testing tool with unit-test-like API.
 - Warms up tested functions.
 - Measures memory allocation of each test.
 - Supports TypeScript test files as is.
+- Zero dependencies.
 
 ```shell
 npm install toofast --save-dev
@@ -89,7 +90,8 @@ TooFast prints results of each test:
 - `± 2.29%` is the margin of error of the value on its left at 95% confidence.
 
 Values that weren't measured are shown as `n/a`, for example, the memory of a test with
-[memory measurement](#config-maxbatchmemorysamplecount) turned off.
+[memory measurement](#config-maxbatchmemorysamplecount) turned off. The margin of error is shown as `n/a` if it's
+unknown, for example, if a measure has run a single batch.
 
 The process exits with code 1 if a test, a `describe` block, a hook or a test file throws, if a test process crashes, or
 if no tests are found.
@@ -137,7 +139,9 @@ callback returns.
 
 The measured callback must be synchronous: if it returns a promise, the measure fails.
 
-If a test has several measures, their results are combined into the result of the test:
+If a test has several measures, the result of the test is the mean of their call durations and allocations, where each
+measure has the same weight no matter how many batches it has run. The difference between measured callbacks doesn't add
+to the margin of error:
 
 ```ts
 test('factorial of 33 and 42', () => {

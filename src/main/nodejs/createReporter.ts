@@ -1,6 +1,6 @@
 import rl from 'readline';
 import { type InspectColor, styleText } from 'util';
-import { Histogram } from '../Histogram.ts';
+import type { HistogramSummary } from '../Histogram.ts';
 import type { WorkerEvent } from '../runner.ts';
 
 type Style = InspectColor | InspectColor[];
@@ -129,23 +129,19 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
     return applyStyle(STYLE_NUMBER_INTEGER, valueLabel) + unitLabel;
   }
 
-  function formatRme(histogram: Histogram): string {
-    // The margin of error is unknown for a single sample
-    const rmeLabel = histogram.size < 2 ? 'n/a' : rmeFormat.format(histogram.rme);
-
-    return applyStyle(STYLE_RME, ' ± ' + rmeLabel.padEnd(6));
-  }
-
   /**
-   * Formats a value and its margin of error, or n/a if nothing was measured.
+   * Formats a value and its margin of error, or `n/a` if nothing was measured.
    */
-  function formatStats(histogram: Histogram, value: number, unit: string): string {
-    if (histogram.size === 0) {
+  function formatSummary(summary: HistogramSummary, value: number, unit: string): string {
+    if (summary.size === 0) {
       // A value that wasn't measured isn't shown as zero, and the column keeps its width
       return applyStyle(STYLE_NOT_AVAILABLE, 'n/a'.padStart(5)) + ' '.repeat(unit.length + 11);
     }
 
-    return formatMeasurement(value, unit) + formatRme(histogram);
+    // For example, the margin of error is unknown if a measure has run a single batch
+    const rmeLabel = Number.isNaN(summary.rme) ? 'n/a' : rmeFormat.format(summary.rme);
+
+    return formatMeasurement(value, unit) + applyStyle(STYLE_RME, ' ± ' + rmeLabel.padEnd(6));
   }
 
   return {
@@ -202,8 +198,8 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
           break;
 
         case 'test_ended': {
-          const durationHistogram = new Histogram(event.durationSnapshot);
-          const memoryHistogram = new Histogram(event.memorySnapshot);
+          // Durations are in milliseconds
+          const hz = 1_000 / event.durationSummary.mean;
 
           clearLine();
           print(
@@ -213,9 +209,9 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
                 : applyStyle(STYLE_SUCCESS_SYMBOL, SYMBOL_SUCCESS + ' ')) +
               testName +
               PADDING +
-              formatStats(durationHistogram, durationHistogram.hz, 'Hz') +
+              formatSummary(event.durationSummary, hz, 'Hz') +
               PADDING +
-              formatStats(memoryHistogram, memoryHistogram.mean, 'B') +
+              formatSummary(event.memorySummary, event.memorySummary.mean, 'B') +
               '\n'
           );
 

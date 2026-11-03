@@ -88,7 +88,7 @@ describe('resolveConfig', () => {
       'toofast.json': JSON.stringify({ aaa: 111 }),
     });
 
-    expect(() => resolveConfig([], directory)).toThrow('Unknown config option:aaa');
+    expect(() => resolveConfig([], directory)).toThrow('Unknown config option: aaa');
   });
 
   test('throws if a config file has test file patterns that are not strings', () => {
