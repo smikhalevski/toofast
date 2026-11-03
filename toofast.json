@@ -2,7 +2,7 @@
   "$schema": "./src/main/config_schema.json",
   "testOptions": {
     "maxWarmupBatchIterationCount": 1000,
-    "targetRme": 0.025
+    "targetRme": 0.1
   },
-  "testFilePatterns": ["./src/test/perf.js"]
+  "testFilePatterns": ["./src/test/*.perf.ts"]
 }

@@ -8,9 +8,9 @@ type Style = InspectColor | InspectColor[];
 const PADDING = '  ';
 
 const SYMBOL_WARMUP = '●';
-const SYMBOL_SUCCESS = '●';
-const SYMBOL_ERROR = '●';
-const SYMBOL_PROGRESS = '○◔◑◕●';
+const SYMBOL_SUCCESS = '✓';
+const SYMBOL_ERROR = '✗';
+const SYMBOLS_PROGRESS = '○◔◑◕●';
 
 const STYLE_DESCRIBE: Style = 'bold';
 const STYLE_WARMUP_SYMBOL: Style = 'yellow';
@@ -21,7 +21,7 @@ const STYLE_SUCCESS_SYMBOL: Style = 'green';
 const STYLE_ERROR_SYMBOL: Style = 'red';
 const STYLE_ERROR_MESSAGE: Style = 'red';
 const STYLE_NUMBER_INTEGER: Style = 'yellow';
-const STYLE_NUMBER_DECIMAL: Style = ['dim', 'yellow'];
+const STYLE_NUMBER_FRACTION: Style = ['dim', 'yellow'];
 const STYLE_RME: Style = 'dim';
 
 export interface Reporter {
@@ -90,10 +90,8 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
   }
 
   function formatProgressSymbol(percentage: number): string {
-    const symbol =
-      SYMBOL_PROGRESS[Math.min(Math.trunc(percentage * SYMBOL_PROGRESS.length), SYMBOL_PROGRESS.length - 1)];
+    const symbol = SYMBOLS_PROGRESS[Math.trunc(percentage * (SYMBOLS_PROGRESS.length - 1))];
 
-    // Other measures of a failed test still run
     return applyStyle(STYLE_PROGRESS_SYMBOL, symbol + ' ');
   }
 
@@ -125,18 +123,16 @@ export function createReporter(stream: NodeJS.WritableStream & { isTTY?: boolean
     const valueLabel = decimalFormat
       .format(value)
       .padStart(5)
-      .replace(/\D\d+$/, fraction => applyStyle(STYLE_NUMBER_DECIMAL, fraction));
+      .replace(/\.\d+$/, fraction => applyStyle(STYLE_NUMBER_FRACTION, fraction));
 
     return applyStyle(STYLE_NUMBER_INTEGER, valueLabel) + unitLabel;
   }
 
   function formatRme(histogram: Histogram): string {
     // The margin of error is unknown for a single sample
-    if (histogram.size < 2) {
-      return ' '.repeat(9);
-    }
+    const rmeLabel = histogram.size < 2 ? 'n/a' : rmeFormat.format(histogram.rme);
 
-    return applyStyle(STYLE_RME, ' ± ' + rmeFormat.format(histogram.rme).padEnd(6));
+    return applyStyle(STYLE_RME, ' ± ' + rmeLabel.padEnd(6));
   }
 
   return {

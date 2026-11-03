@@ -5,6 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "description": "The path or the URL of this schema, so editors can validate the config file.",
+      "type": "string"
+    },
     "setupFilePatterns": {
       "description": "Glob patterns of modules that are loaded before each test file.",
       "type": "array",

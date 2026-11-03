@@ -44,14 +44,14 @@ describe('createReporter', () => {
     expect(output).toContain('✗ bbb');
   });
 
-  test('prints progress as a bar', () => {
+  test('does not print a full circle before progress is complete', () => {
     const stream = Object.assign(new PassThrough(), { isTTY: true });
     const reporter = createReporter(stream);
 
     reporter.printTestStart('aaa');
-    reporter.printTestEvent({ type: 'progress_updated', measureIndex: 0, measureCount: 1, percentage: 0.5 });
+    reporter.printTestEvent({ type: 'progress_updated', measureIndex: 0, measureCount: 1, percentage: 0.8 });
 
-    expect(String(stream.read())).toContain('▅');
+    expect(String(stream.read())).toContain('◕');
   });
 
   test('prints all errors of a test', () => {

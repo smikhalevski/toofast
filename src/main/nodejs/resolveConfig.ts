@@ -98,7 +98,13 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   assert(isObject(config), 'Config file must export an object: ' + configPath);
 
-  const { setupFilePatterns = [], testFilePatterns = TEST_FILE_PATTERNS, testOptions = {}, ...unknownOptions } = config;
+  const {
+    $schema,
+    setupFilePatterns = [],
+    testFilePatterns = TEST_FILE_PATTERNS,
+    testOptions = {},
+    ...unknownOptions
+  } = config;
 
   const unknownOptionNames = Object.keys(unknownOptions);
 
