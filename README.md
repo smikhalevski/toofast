@@ -4,12 +4,12 @@
 
 The Node.js performance testing tool with unit-test-like API.
 
-- Each test runs in its own process.
-- Timer resolution doesn't distort test results.
-- Runs batches of calls until target margin of error is reached.
+- Runs each test in its own process.
+- Prevents timer resolution from distorting test results.
+- Runs batches of calls until the target margin of error is reached.
 - Warms up tested functions.
 - Measures memory allocation of each test.
-- Support TypeScript test files as is.
+- Supports TypeScript test files as is.
 
 ```shell
 npm install toofast --save-dev
@@ -34,9 +34,9 @@ TooFast requires Node.js 22.18+.
 - [Inline options](#inline-options)
 - [Command line arguments](#command-line-arguments)
 
-🔬&ensp;[**How measurement works**](#how-measurement-works)
+🎯&ensp;[**How measurement works**](#how-measurement-works)
 
-🏁&ensp;[**Why TooFast?**](#why-toofast)
+🍿&ensp;[**Why TooFast?**](#why-toofast)
 
 # Usage
 
@@ -77,7 +77,7 @@ TooFast prints results of each test:
 <br>
 
 <p align="center">
-  <img alt="TooFast" src="./assets/screenshot.svg" width="430" />
+  <img alt="Test results" src="./assets/screenshot.svg" width="430" />
 </p>
 
 <br>
@@ -299,7 +299,7 @@ Test options control how measures run. Set them in the [config file](#config-tes
 The maximum duration of a measure in milliseconds, not counting warmup. When it's reached, the measure stops even if
 [`targetRme`](#config-targetrme) isn't reached yet.
 
-Defaults to 10 000.
+Defaults to 10 000.
 
 </dd>
 <dt><a name="config-targetrme"></a><code>targetRme</code></dt>
@@ -328,7 +328,7 @@ The maximum number of calls during warmup. V8 optimizes a function after it has 
 slow unoptimized calls out of the results. Warmup is also limited by [`batchTimeout`](#config-batchtimeout) and
 [`maxBatchIterationCount`](#config-maxbatchiterationcount).
 
-Defaults to 10 000. Set to 0 to skip warmup.
+Defaults to 10 000. Set to 0 to skip warmup.
 
 </dd>
 <dt><a name="config-maxbatchiterationcount"></a><code>maxBatchIterationCount</code></dt>
@@ -345,7 +345,7 @@ Unlimited by default.
 
 The maximum duration of a batch in milliseconds. A batch always times at least one loop, even if that loop takes longer.
 
-Defaults to 1 000.
+Defaults to 1 000.
 
 </dd>
 <dt><a name="config-batchpauseduration"></a><code>batchPauseDuration</code></dt>
@@ -472,13 +472,13 @@ How TooFast compares to other tools:
 
 |                           | TooFast          | Vitest bench     | tinybench  | mitata     | bench-node           | cronometro      |
 | ------------------------- | ---------------- | ---------------- | ---------- | ---------- | -------------------- | --------------- |
-| Isolation                 | Process per test | Process per file | 🔴         | 🔴         | Worker per benchmark | Worker per test |
+| Isolation                 | Process per test | Process per file | None       | None       | Worker per benchmark | Worker per test |
 | Timing of fast functions  | Loops            | Each call        | Each call  | Loops      | Loops                | Each call       |
 | Stops when                | Precise enough   | Time is up       | Time is up | Time is up | Time is up           | Precise enough  |
-| `describe` and `test` API | 🟢               | 🟢               | 🔴         | 🔴         | 🔴                   | 🔴              |
-| CLI that finds test files | 🟢               | 🟢               | 🔴         | 🔴         | 🔴                   | 🔴              |
-| Async functions           | 🔴               | 🟢               | 🟢         | 🟢         | 🟢                   | 🟢              |
-| Memory usage              | 🟢               | 🔴               | 🔴         | 🟢         | 🔴                   | 🔴              |
+| `describe` and `test` API | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
+| CLI that finds test files | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
+| Async functions           | ❌               | ✅               | ✅         | ✅         | ✅                   | ✅              |
+| Memory usage              | ✅               | ❌               | ❌         | ✅         | ❌                   | ❌              |
 | Runtimes                  | Node.js          | Node.js, browser | Multiple   | Multiple   | Node.js              | Node.js         |
 
 <hr/>
