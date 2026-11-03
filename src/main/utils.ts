@@ -1,21 +1,53 @@
-import { HookCallback } from './index.js';
-
 export function noop(): void {}
 
-export function getErrorMessage(error: any): string {
+/**
+ * Throws an error with the message if the condition is false. Unlike the Node.js assert module, works on any platform.
+ */
+export function assert(condition: boolean, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+export function getErrorStackOrMessage(error: any): string {
   return error instanceof Error ? error.stack || error.message : String(error);
+}
+
+export function getErrorMessage(error: any): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export function combineHooks(a: HookCallback | undefined, b: HookCallback | undefined): HookCallback | undefined {
-  if (a === undefined || b === undefined) {
-    return a || b;
-  }
-  return async () => {
-    await a();
-    await b();
-  };
+export function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+export function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Returns true if the value is an object, but not an array.
+ */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isArrayOf<T>(value: unknown, predicate: (item: unknown) => item is T): value is T[] {
+  return Array.isArray(value) && value.every(predicate);
+}
+
+export function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+/**
+ * Converts a glob pattern, where "*" matches any characters, to a case-insensitive RegExp that matches the whole
+ * string.
+ */
+export function globToRegExp(pattern: string): RegExp {
+  return new RegExp('^' + pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'i');
 }

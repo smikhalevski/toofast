@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TooFast config",
+  "description": "The config file of TooFast. Patterns are relative to the config file.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "setupFilePatterns": {
+      "description": "Glob patterns of modules that are loaded before each test file.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "testFilePatterns": {
+      "description": "Glob patterns of test files. Files in node_modules are never run.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": ["**/*.perf.{js,mjs,ts,mts}"]
+    },
+    "testOptions": {
+      "description": "The default test options of all tests. Options of describe(), test() and measure() override them.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "measureTimeout": {
+          "description": "The maximum measure duration in milliseconds. Doesn't include warmup.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 10000
+        },
+        "targetRme": {
+          "description": "The relative margin of error of mean iteration durations of batches that stops the measure before measureTimeout.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1,
+          "default": 0.05
+        },
+        "minBatchCount": {
+          "description": "The number of batches that a measure runs before targetRme can stop it. A few batches can agree by chance while CPU frequency or scheduling is changing. measureTimeout can still end the measure with fewer batches.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 5
+        },
+        "maxWarmupBatchIterationCount": {
+          "description": "The maximum number of iterations in the warmup batch. V8 optimizes a function after it was called several thousand times. The warmup batch is also limited by batchTimeout and maxBatchIterationCount. Set to 0 to disable warmup.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 10000
+        },
+        "maxBatchIterationCount": {
+          "description": "The maximum number of iterations in a batch, including iterations that sample memory and calibrate the duration of a loop. Unlimited by default.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "batchTimeout": {
+          "description": "The maximum duration of a batch in milliseconds. A batch times at least one loop.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 1000
+        },
+        "batchPauseDuration": {
+          "description": "The pause after each batch in milliseconds. VM is expected to run garbage collector during the pause.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 200
+        },
+        "minLoopDuration": {
+          "description": "The minimum duration of a loop in milliseconds, so timer resolution and overhead don't distort results of fast callbacks. Loops have a single iteration if there are iteration hooks, and are shorter if maxBatchIterationCount doesn't allow longer loops.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "maxBatchMemorySampleCount": {
+          "description": "The maximum number of memory samples in a batch. A memory sample is an iteration after a loop, which allocations are measured instead of its duration. Set to 0 to disable memory measurement.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 10
+        }
+      }
+    }
+  }
+}

@@ -1,52 +1,82 @@
 name: publish
 
 on:
+  # release
   push:
-    tags: [ "v[0-9]+.[0-9]+.[0-9]+" ]
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+  # prerelease
+  workflow_dispatch:
+    inputs:
+      prerelease_type:
+        description: Prerelease type
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+        default: patch
+        required: true
+
+      tag:
+        description: Tag
+        type: string
+        default: next
+        required: true
+
+run-name: ${{ github.event_name == 'push' && github.ref_name || 'prerelease' }}
+
+permissions:
+  id-token: write
+  contents: write
 
 jobs:
-
-  publish:
+  publish-package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: '26'
           cache: npm
-          registry-url: "https://registry.npmjs.org"
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Set prerelease version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm version --no-git-tag-version ${{ inputs.prerelease_type }}
+
+          npm version --no-git-tag-version "$(npm pkg get version | xargs)-${{ inputs.tag }}.${GITHUB_SHA::7}"
 
       - run: npm ci
       - run: npm run build
-      - run: npm run docs
+      - run: npm run lint
       - run: npm test
 
-      - run: npm publish
+      - name: Publish package
         working-directory: ./lib
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --tag ${{ inputs.tag || 'latest' }}
 
-      - name: Push docs to ghpages
+          echo "::notice title=Package::npm install --save-exact $(npm pkg get name | xargs)@$(npm pkg get version | xargs)"
+
+      - name: Update latest tag
+        if: github.event_name == 'push'
         run: |
           set -x
 
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+          git push origin :refs/tags/latest
+          git tag --force latest
+          git push origin tag latest
 
-          TEMP_DIR=$(mktemp -d)
-          mv ./docs $TEMP_DIR
-
-          git fetch origin ghpages:ghpages
-          git checkout ghpages
-          git rm -rf .
-          git clean -fxd
-          
-          cp -R $TEMP_DIR/docs/. .
-
-          git add .
-          git commit -m "Updated docs ($(git rev-parse --short $GITHUB_SHA))"
-          git push origin ghpages
-
-      - run: gh release create ${{ github.ref_name }} --generate-notes --draft
+      - name: Create release notes
+        if: github.event_name == 'push'
+        run: gh release create ${{ github.ref_name }} --generate-notes --draft
         env:
           GH_TOKEN: ${{ github.token }}
+
+  publish-docs:
+    if: github.event_name == 'push'
+    needs: [publish-package]
+    uses: ./.github/workflows/publish-docs.yml

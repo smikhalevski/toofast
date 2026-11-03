@@ -1,151 +1,161 @@
-import { Adder } from './Adder.js';
-
 /**
- * Population statistics passed between master and fork processes.
+ * A snapshot of a histogram, from which all statistics are computed. A worker process sends it to the main process.
  */
-export interface HistogramStats {
+export interface HistogramSnapshot {
   /**
-   * The total number of measurements in the population.
+   * The number of values in the sample.
    */
-  readonly size: number;
+  size: number;
 
   /**
-   * The mean value.
+   * The arithmetic mean of values.
    */
-  readonly mean: number;
+  mean: number;
 
   /**
-   * The expectation of the squared deviation of a random variable from its mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
-   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance Algorithms for calculating variance}
+   * The sum of squared deviations of values from the mean.
    */
-  readonly variance: number;
-
-  /**
-   * The standard deviation is a measure of the amount of variation or dispersion of a set of values.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
-   */
-  readonly sd: number;
-
-  /**
-   * The standard error of the mean.
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
-   */
-  readonly sem: number;
-
-  /**
-   * The margin of error.
-   */
-  readonly moe: number;
-
-  /**
-   * The relative margin of error [0, 1].
-   *
-   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
-   */
-  readonly rme: number;
-
-  /**
-   * The number of executions per second.
-   */
-  readonly hz: number;
+  sumOfSquaredDeviations: number;
 }
 
 /**
- * Provides access to mutable population statistics.
+ * Accumulates values of a sample and computes statistics without storing the values. Uses Welford's online algorithm,
+ * which is numerically stable and never produces a negative variance.
+ *
+ * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm Welford's online algorithm}
  */
-export class Histogram implements HistogramStats {
-  size = 0;
+export class Histogram {
+  private _size: number;
+  private _mean: number;
+  private _sumOfSquaredDeviations: number;
 
   /**
-   * Total sum of all values added to the histogram.
+   * Creates an empty histogram, or restores a histogram from its snapshot, for example, after the snapshot was sent
+   * from another process.
    */
-  private readonly _adder = new Adder();
+  constructor(snapshot: HistogramSnapshot = { size: 0, mean: 0, sumOfSquaredDeviations: 0 }) {
+    this._size = snapshot.size;
+    this._mean = snapshot.mean;
+    this._sumOfSquaredDeviations = snapshot.sumOfSquaredDeviations;
+  }
 
   /**
-   * Total sum of all squared values added to the histogram.
+   * The number of values in the sample.
    */
-  private readonly _sqAdder = new Adder();
+  get size(): number {
+    return this._size;
+  }
 
+  /**
+   * The arithmetic mean of values.
+   */
   get mean(): number {
-    const { size, _adder } = this;
-
-    return size === 0 ? 0 : _adder.sum / size;
+    return this._mean;
   }
 
+  /**
+   * The unbiased sample variance. The sum of squared deviations from the mean is divided by size - 1, because the mean
+   * is estimated from the same sample.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Variance Variance}
+   */
   get variance(): number {
-    const { size, _sqAdder, _adder } = this;
-
-    return size === 0 ? 0 : (_sqAdder.sum - (_adder.sum * _adder.sum) / size) / size;
+    return this.size < 2 ? 0 : this._sumOfSquaredDeviations / (this.size - 1);
   }
 
+  /**
+   * The standard deviation, the square root of {@link variance}.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Standard_deviation Standard deviation}
+   */
   get sd(): number {
     return Math.sqrt(this.variance);
   }
 
+  /**
+   * The standard error of the mean, {@link sd} divided by the square root of {@link size}.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Standard_error Standard error}
+   */
   get sem(): number {
-    const { size } = this;
-
-    return size === 0 ? 0 : this.sd / Math.sqrt(size);
+    return this.size === 0 ? 0 : this.sd / Math.sqrt(this.size);
   }
 
+  /**
+   * The margin of error of the mean at 95% confidence, {@link sem} multiplied by the critical value of the
+   * t-distribution.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Margin_of_error Margin of error}
+   */
   get moe(): number {
-    const { size } = this;
-
-    return size === 0 ? 0 : this.sem * tTable[Math.min(size, tTable.length) - 1];
+    return this.size < 2 ? 0 : this.sem * getCriticalValue(this.size - 1);
   }
 
+  /**
+   * The margin of error relative to the mean, for example, 0.05 for ±5%.
+   */
   get rme(): number {
-    return this.size === 0 ? 0 : this.moe / this.mean;
+    // The mean is 0 if all values are 0, so there's no error
+    return this.mean === 0 ? 0 : this.moe / this.mean;
   }
 
+  /**
+   * The number of iterations per second, if values are iteration durations in milliseconds.
+   */
   get hz(): number {
     return this.size === 0 ? 0 : 1000 / this.mean;
   }
 
   /**
-   * Add a new measurement to the histogram.
-   *
-   * @param value The value to add.
+   * Adds a value to the sample.
    */
-  add(value: number): void;
+  add(value: number): void {
+    const delta = value - this._mean;
 
-  /**
-   * Adds all measurements from another histogram.
-   *
-   * @param histogram The histogram to add measurements from.
-   */
-  add(histogram: Histogram): void;
+    this._size++;
+    this._mean += delta / this._size;
 
-  add(value: number | Histogram): void {
-    const { _adder, _sqAdder } = this;
-
-    if (typeof value === 'number') {
-      _adder.add(value);
-      _sqAdder.add(value * value);
-      this.size++;
-    } else {
-      _adder.add(value._adder.sum);
-      _sqAdder.add(value._sqAdder.sum);
-      this.size += value.size;
-    }
+    // The deviation from the previous mean is multiplied by the deviation from the updated mean
+    this._sumOfSquaredDeviations += delta * (value - this._mean);
   }
 
   /**
-   * Returns the snapshot of the current histogram stats.
+   * Adds all values of another histogram to the sample.
+   *
+   * @see {@link https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm}
    */
-  getStats(): HistogramStats {
-    const { size, mean, variance, sd, sem, moe, rme, hz } = this;
+  merge(histogram: Histogram): void {
+    if (histogram._size === 0) {
+      return;
+    }
 
-    return { size, mean, variance, sd, sem, moe, rme, hz };
+    const size = this._size + histogram._size;
+    const delta = histogram._mean - this._mean;
+
+    this._mean += (delta * histogram._size) / size;
+    this._sumOfSquaredDeviations +=
+      histogram._sumOfSquaredDeviations + (delta * delta * this._size * histogram._size) / size;
+    this._size = size;
+  }
+
+  /**
+   * Returns the snapshot that restores the histogram with the constructor.
+   */
+  getSnapshot(): HistogramSnapshot {
+    return { size: this._size, mean: this._mean, sumOfSquaredDeviations: this._sumOfSquaredDeviations };
   }
 }
 
 /**
- * T-Distribution two-tailed critical values for 95% confidence.
+ * Returns the two-tailed critical value of the t-distribution at 95% confidence.
+ */
+function getCriticalValue(degreesOfFreedom: number): number {
+  // Beyond the table, values decrease slowly from 1.98 to 1.96, so the last value is used
+  return tTable[Math.min(degreesOfFreedom, tTable.length) - 1];
+}
+
+/**
+ * Critical values of the t-distribution. The value at index i is for i + 1 degrees of freedom.
  */
 // prettier-ignore
 const tTable = [
@@ -163,5 +173,5 @@ const tTable = [
    1.9873, 1.9870, 1.9867, 1.9864, 1.9861, 1.9858, 1.9855, 1.9852,
    1.9849, 1.9846, 1.9843, 1.9840, 1.9838, 1.9836, 1.9834, 1.9832,
    1.9830, 1.9828, 1.9826, 1.9824, 1.9822, 1.9820, 1.9818, 1.9816,
-   1.9814, 1.9812, 1.9819, 1.9808, 1.9806, 1.9804, 1.9802, 1.9800,
+   1.9814, 1.9812, 1.9810, 1.9808, 1.9806, 1.9804, 1.9802, 1.9800,
 ];

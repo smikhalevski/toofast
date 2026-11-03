@@ -7,6 +7,9 @@
   "disableSources": true,
   "hideGenerator": true,
   "readme": "none",
-  "tsconfig": "./tsconfig.build.json",
+  "tsconfig": "./tsconfig.json",
+  "navigation": {
+    "includeFolders": false
+  },
   "entryPoints": ["./src/main/index.ts"]
 }

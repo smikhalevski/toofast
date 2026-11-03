@@ -1,31 +1,15 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { combineHooks } from '../main/utils.js';
+import { describe, expect, test } from 'vitest';
+import { globToRegExp } from '../main/utils.ts';
 
-describe('combineHooks', () => {
-  const aMock = vi.fn();
-  const bMock = vi.fn();
+describe('globToRegExp', () => {
+  test('matches any characters with * case-insensitively', () => {
+    const re = globToRegExp('aaa*');
 
-  beforeEach(() => {
-    aMock.mockReset();
-    bMock.mockReset();
+    expect(re.test('AAA.bbb')).toBe(true);
+    expect(re.test('bbb.aaa')).toBe(false);
   });
 
-  test('returns undefined', () => {
-    expect(combineHooks(undefined, undefined)).toBeUndefined();
-  });
-
-  test('returns a hook', async () => {
-    expect(combineHooks(aMock, undefined)).toBe(aMock);
-    expect(combineHooks(undefined, bMock)).toBe(bMock);
-
-    const hook = combineHooks(aMock, bMock);
-    expect(hook).toBeTypeOf('function');
-    expect(hook).not.toBe(aMock);
-    expect(hook).not.toBe(bMock);
-
-    await hook!();
-
-    expect(aMock).toHaveBeenCalledTimes(1);
-    expect(bMock).toHaveBeenCalledTimes(1);
+  test('matches RegExp characters literally', () => {
+    expect(globToRegExp('aaa.bbb').test('aaa_bbb')).toBe(false);
   });
 });
