@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="437" height="185" viewBox="0 0 437 185" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" width="477" height="207" viewBox="0 0 477 207" role="img"
      aria-labelledby="title desc">
     <title id="title">toofast output</title>
-    <desc id="desc">Running npx toofast prints the factorial test: of 33 passed with 4.2 MHz ± 2.29% and 314.9 B ±
-        2.67%, of 42 passed with 3.3 MHz ± 1.1% and 458.8 B ± 1.87%.
+    <desc id="desc">Running npx toofast prints a table with the Test, Speed and Memory columns. In the factorial
+        group, of 33 passed with 4.20 MHz ± 2.29% and 314.90 B ± 2.67%, and of 42 passed with 3.30 MHz ± 1.10% and
+        458.80 B ± 1.87%.
     </desc>
-    <!-- Contrast on GitHub's dark background: text 15:1, values and ticks 7:1, window 6:1, dimmed text 3.5:1. -->
+    <!-- Contrast on GitHub's dark background: text 15:1, values and ticks 7:1, window 6:1,
+        dimmed text and separators 3.5:1. -->
     <style>
         svg { color: #dde6ef; }
         text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -13,9 +15,11 @@
         .window-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial,
         sans-serif; font-size: 13px; font-weight: 600; text-anchor: middle; }
         rect, path { fill: none; stroke: #8a929a; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+        .bold { font-weight: bold; }
         .dim { fill: #636b73; }
         .value { fill: #bf9840; }
         .value .dim { fill: #876501; }
+        .separator { stroke: #636b73; }
         .passed { stroke: #55b05a; }
         /* macOS window buttons */
         circle { stroke-width: 1; }
@@ -25,39 +29,59 @@
     </style>
 
     <!-- terminal window, its edges sit on half pixels so the 1px stroke covers whole pixels -->
-    <rect x="0.5" y="0.5" width="436" height="184" rx="6"/>
+    <rect x="0.5" y="0.5" width="476" height="206" rx="6"/>
     <circle class="close" cx="26" cy="24" r="6"/>
     <circle class="minimize" cx="46" cy="24" r="6"/>
     <circle class="zoom" cx="66" cy="24" r="6"/>
-    <text class="window-title" x="218.5" y="28.5">zsh — zsh</text>
+    <text class="window-title" x="238.5" y="28.5">zsh — zsh</text>
 
-    <!-- columns are 8.4px apart, the width of one character -->
+    <!-- columns are 8.4px apart, the width of one character, and rows are 22px apart -->
     <text x="20" y="73">$ npx toofast</text>
-    <text x="20" y="117">factorial</text>
 
-    <path class="passed" d="M37.8 134.8 L40.2 137.6 L44.4 130.6"/>
-    <text x="53.6" y="139">of 33</text>
-    <text x="129.2" y="139">
-        <tspan class="value">4<tspan class="dim">.2</tspan></tspan>
-        MHz
-    </text>
-    <text class="dim" x="196.4" y="139">± 2.29%</text>
-    <text x="280.4" y="139">
-        <tspan class="value">314<tspan class="dim">.9</tspan></tspan>
-        B
-    </text>
-    <text class="dim" x="356" y="139">± 2.67%</text>
+    <!-- column separators are continuous, like box-drawing characters in a terminal -->
+    <path class="separator" d="M108.5 79 V189 M293.5 79 V189"/>
+
+    <text class="dim" x="20" y="95">Test</text>
+    <text class="dim" x="120.8" y="95">Speed</text>
+    <text class="dim" x="305.6" y="95">Memory</text>
+
+    <text class="bold" x="20" y="139">factorial</text>
 
     <path class="passed" d="M37.8 156.8 L40.2 159.6 L44.4 152.6"/>
-    <text x="53.6" y="161">of 42</text>
-    <text x="129.2" y="161">
-        <tspan class="value">3<tspan class="dim">.3</tspan></tspan>
-        MHz
+    <text x="53.6" y="161">of 33</text>
+    <text y="161">
+        <tspan class="value" x="137.6">4<tspan class="dim">.20</tspan></tspan>
+        <tspan x="179.6">MHz</tspan>
     </text>
-    <text class="dim" x="196.4" y="161">± 1.1%</text>
-    <text x="280.4" y="161">
-        <tspan class="value">458<tspan class="dim">.8</tspan></tspan>
-        B
+    <text class="dim" y="161">
+        <tspan x="213.2">±</tspan>
+        <tspan x="238.4">2.29%</tspan>
     </text>
-    <text class="dim" x="356" y="161">± 1.87%</text>
+    <text y="161">
+        <tspan class="value" x="305.6">314<tspan class="dim">.90</tspan></tspan>
+        <tspan x="364.4">B</tspan>
+    </text>
+    <text class="dim" y="161">
+        <tspan x="389.6">±</tspan>
+        <tspan x="414.8">2.67%</tspan>
+    </text>
+
+    <path class="passed" d="M37.8 178.8 L40.2 181.6 L44.4 174.6"/>
+    <text x="53.6" y="183">of 42</text>
+    <text y="183">
+        <tspan class="value" x="137.6">3<tspan class="dim">.30</tspan></tspan>
+        <tspan x="179.6">MHz</tspan>
+    </text>
+    <text class="dim" y="183">
+        <tspan x="213.2">±</tspan>
+        <tspan x="238.4">1.10%</tspan>
+    </text>
+    <text y="183">
+        <tspan class="value" x="305.6">458<tspan class="dim">.80</tspan></tspan>
+        <tspan x="364.4">B</tspan>
+    </text>
+    <text class="dim" y="183">
+        <tspan x="389.6">±</tspan>
+        <tspan x="414.8">1.87%</tspan>
+    </text>
 </svg>

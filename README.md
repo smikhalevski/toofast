@@ -80,13 +80,13 @@ TooFast prints results of each test:
 <p align="center"><picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/screenshot-dark.svg" />
   <source media="(prefers-color-scheme: light)" srcset="./assets/screenshot-light.svg" />
-  <img alt="Test results" src="./assets/screenshot-light.svg" width="430" />
+  <img alt="Test results" src="./assets/screenshot-light.svg" width="477" />
 </picture></p>
 
 <br>
 
 - `4.20 MHz` is how many times per second the function runs: 4.2 million calls per second.
-- `314.00 B` is how many bytes a call allocates on the heap.
+- `314.90 B` is how many bytes a call allocates on the heap.
 - `± 2.29%` is the margin of error of the value on its left at 95% confidence.
 
 Values that weren't measured are shown as `n/a`, for example, the memory of a test with
