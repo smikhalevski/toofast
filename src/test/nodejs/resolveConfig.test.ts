@@ -80,7 +80,7 @@ describe('resolveConfig', () => {
       'toofast.json': '[]',
     });
 
-    expect(() => resolveConfig([], dir)).toThrow('Config file must export an object: toofast.json');
+    expect(() => resolveConfig([], dir)).toThrow('Config must be an object: toofast.json');
   });
 
   test('throws if a config file has an unknown option', () => {

@@ -1,10 +1,13 @@
 import type { HistogramSummary } from '../Histogram.ts';
 
 /**
- * The role of a piece of text in the report. The reporter decides how each role looks, for example, which color it
- * has.
+ * The role of a piece of text in the report.
+ *
+ * The reporter decides how each role looks, for example, which color it has.
  */
-export type Style =
+export type TextRole =
+  | 'column_name'
+  | 'column_separator'
   | 'describe_name'
   | 'warmup_symbol'
   | 'progress_symbol'
@@ -16,7 +19,22 @@ export type Style =
   | 'number_integer'
   | 'number_fraction'
   | 'not_available'
-  | 'rme';
+  | 'rme'
+  | 'excessive_rme';
+
+/**
+ * A line of the report that shows the name of a describe block or a test in the test column.
+ */
+export interface TestColumnLine {
+  kind: 'describe' | 'test';
+
+  /**
+   * The number of describe blocks that enclose the describe block or the test.
+   */
+  depth: number;
+
+  name: string;
+}
 
 export interface FormatDescribeStartParams {
   /**
@@ -24,6 +42,11 @@ export interface FormatDescribeStartParams {
    */
   depth: number;
   name: string;
+
+  /**
+   * The width of the test column, see {@link Formatter.getTestColumnWidth}.
+   */
+  testColumnWidth: number;
 }
 
 export interface FormatTestStartParams {
@@ -32,25 +55,35 @@ export interface FormatTestStartParams {
    */
   depth: number;
 
-  /**
-   * The name of the test, padded to align results of sibling tests.
-   */
   testName: string;
+
+  /**
+   * The width of the test column, see {@link Formatter.getTestColumnWidth}. It's the same for all tests, so their
+   * results are aligned.
+   */
+  testColumnWidth: number;
 }
 
-export interface FormatWarmupStartedParams extends FormatTestStartParams {
+export interface FormatWarmupStartParams extends FormatTestStartParams {
+  /**
+   * The index of the measure among measures of the test.
+   */
   measureIndex: number;
+
+  /**
+   * The number of measures of the test.
+   */
   measureCount: number;
 }
 
-export interface FormatProgressUpdatedParams extends FormatWarmupStartedParams {
+export interface FormatProgressParams extends FormatWarmupStartParams {
   /**
    * The progress of the measure, between `0` and `1`.
    */
   percentage: number;
 }
 
-export interface FormatTestEndedParams extends FormatTestStartParams {
+export interface FormatTestEndParams extends FormatTestStartParams {
   /**
    * `true` if the test has thrown an error.
    */
@@ -63,6 +96,25 @@ export interface FormatTestEndedParams extends FormatTestStartParams {
  * Formats lines of the report. Lines don't end with a line break, so the reporter decides how lines follow each other.
  */
 export interface Formatter {
+  /**
+   * Returns the width of the test column, which fits the name of the column, and names of describe blocks and tests in
+   * lines with their indents and symbols.
+   */
+  getTestColumnWidth(lines: readonly TestColumnLine[]): number;
+
+  /**
+   * Formats names of columns.
+   */
+  formatHeader(testColumnWidth: number): string;
+
+  /**
+   * Formats a line that has only separators of columns, for example, to separate groups of tests.
+   */
+  formatEmptyLine(testColumnWidth: number): string;
+
+  /**
+   * Formats the name of a describe block.
+   */
   formatDescribeStart(params: FormatDescribeStartParams): string;
 
   /**
@@ -70,30 +122,50 @@ export interface Formatter {
    */
   formatTestStart(params: FormatTestStartParams): string;
 
-  formatWarmupStarted(params: FormatWarmupStartedParams): string;
+  /**
+   * Formats the status of a test while a measure warms up.
+   */
+  formatWarmupStart(params: FormatWarmupStartParams): string;
 
-  formatProgressUpdated(params: FormatProgressUpdatedParams): string;
+  /**
+   * Formats the progress of a measure of a test.
+   */
+  formatProgress(params: FormatProgressParams): string;
 
   /**
    * Formats the result of a test.
    */
-  formatTestEnded(params: FormatTestEndedParams): string;
+  formatTestEnd(params: FormatTestEndParams): string;
 
+  /**
+   * Formats an error message.
+   */
   formatError(errorMessage: string): string;
 }
 
+/**
+ * Options of a formatter. Symbols are padded to the widest one, so that names of tests are aligned. Columns are widened
+ * to fit their names.
+ */
 export interface FormatterOptions {
   /**
    * Styles a piece of text by its role, for example, colors it. By default, text isn't styled.
    */
-  applyStyle?: (style: Style, text: string) => string;
+  applyStyle?: (textRole: TextRole, text: string) => string;
 
   /**
-   * The indent of each nesting level, and the gap between columns.
+   * The indent of each nesting level, and the gap at the end of a status line.
    *
    * @default '  '
    */
   padding?: string;
+
+  /**
+   * Separates columns of results and their names.
+   *
+   * @default ' │ '
+   */
+  columnSeparator?: string;
 
   /**
    * @default '●'
@@ -116,141 +188,28 @@ export interface FormatterOptions {
    * @default ['○', '◔', '◑', '◕', '●']
    */
   progressSymbols?: readonly string[];
-}
-
-/**
- * Creates a formatter of report lines. It only produces text, so it doesn't depend on the stream the report is
- * printed to.
- */
-export function createFormatter(options: FormatterOptions = {}): Formatter {
-  const {
-    applyStyle = (style, text) => text,
-    padding = '  ',
-    warmupSymbol = '●',
-    successSymbol = '✓',
-    errorSymbol = '✗',
-    progressSymbols = ['○', '◔', '◑', '◕', '●'],
-  } = options;
-
-  function formatProgressSymbol(percentage: number): string {
-    const symbol = progressSymbols[Math.trunc(percentage * (progressSymbols.length - 1))];
-
-    return applyStyle('progress_symbol', symbol + ' ');
-  }
-
-  function formatMeasureIndex(measureIndex: number, measureCount: number): string {
-    if (measureCount === 1) {
-      return '';
-    }
-    const measureIndexLabel = integerFormat.format(measureIndex + 1) + '/' + integerFormat.format(measureCount);
-
-    return applyStyle('measure_index', measureIndexLabel);
-  }
-
-  function formatMeasurement(value: number, unit: string): string {
-    let unitLabel = ' ' + unit + ' ';
-
-    if (value > 1000) {
-      value /= 1000;
-      unitLabel = ' k' + unit;
-    }
-    if (value > 1000) {
-      value /= 1000;
-      unitLabel = ' M' + unit;
-    }
-    if (value > 1000) {
-      value /= 1000;
-      unitLabel = ' G' + unit;
-    }
-
-    const valueLabel = decimalFormat
-      .format(value)
-      .padStart(5)
-      .replace(/\.\d+$/, fraction => applyStyle('number_fraction', fraction));
-
-    return applyStyle('number_integer', valueLabel) + unitLabel;
-  }
 
   /**
-   * Formats a value and its margin of error, or `n/a` if nothing was measured.
+   * @default 'Test'
    */
-  function formatSummary(summary: HistogramSummary, value: number, unit: string): string {
-    if (summary.size === 0) {
-      // A value that wasn't measured isn't shown as zero, and the column keeps its width
-      return applyStyle('not_available', 'n/a'.padStart(5)) + ' '.repeat(unit.length + 11);
-    }
+  testColumnName?: string;
 
-    // For example, the margin of error is unknown if a measure has run a single batch
-    const rmeLabel = Number.isNaN(summary.rme) ? 'n/a' : rmeFormat.format(summary.rme);
+  /**
+   * The name of the column that shows durations as iterations per second.
+   *
+   * @default 'Speed'
+   */
+  durationColumnName?: string;
 
-    return formatMeasurement(value, unit) + applyStyle('rme', ' ± ' + rmeLabel.padEnd(6));
-  }
-
-  return {
-    formatDescribeStart(params) {
-      const { depth, name } = params;
-
-      return padding.repeat(depth) + applyStyle('describe_name', name);
-    },
-
-    formatTestStart(params) {
-      const { depth, testName } = params;
-
-      return padding.repeat(depth) + formatProgressSymbol(0) + testName + padding;
-    },
-
-    formatWarmupStarted(params) {
-      const { depth, testName, measureIndex, measureCount } = params;
-
-      return (
-        padding.repeat(depth) +
-        applyStyle('warmup_symbol', warmupSymbol + ' ') +
-        testName +
-        padding +
-        formatMeasureIndex(measureIndex, measureCount) +
-        padding
-      );
-    },
-
-    formatProgressUpdated(params) {
-      const { depth, testName, measureIndex, measureCount, percentage } = params;
-
-      return (
-        padding.repeat(depth) +
-        formatProgressSymbol(percentage) +
-        testName +
-        padding +
-        formatMeasureIndex(measureIndex, measureCount) +
-        applyStyle('progress_percentage', percentFormat.format(percentage).padStart(5))
-      );
-    },
-
-    formatTestEnded(params) {
-      const { depth, testName, isFailed, durationSummary, memorySummary } = params;
-
-      // Durations are in milliseconds
-      const hz = 1_000 / durationSummary.mean;
-
-      return (
-        padding.repeat(depth) +
-        (isFailed ? applyStyle('error_symbol', errorSymbol + ' ') : applyStyle('success_symbol', successSymbol + ' ')) +
-        testName +
-        padding +
-        formatSummary(durationSummary, hz, 'Hz') +
-        padding +
-        formatSummary(memorySummary, memorySummary.mean, 'B')
-      );
-    },
-
-    formatError(errorMessage) {
-      return applyStyle('error_message', errorMessage);
-    },
-  };
+  /**
+   * @default 'Memory'
+   */
+  memoryColumnName?: string;
 }
 
 const decimalFormat = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
   useGrouping: true,
 });
 
@@ -260,14 +219,229 @@ const integerFormat = new Intl.NumberFormat('en', {
   useGrouping: true,
 });
 
-const percentFormat = new Intl.NumberFormat('en', {
+const progressFormat = new Intl.NumberFormat('en', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
   style: 'percent',
 });
 
 const rmeFormat = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 0,
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  useGrouping: false,
   style: 'percent',
 });
+
+const MAX_VALUE = 999.99;
+const MAX_RME = 0.9999;
+
+const DURATION_UNIT = 'Hz';
+const MEMORY_UNIT = 'B';
+
+const maxDecimalWidth = decimalFormat.format(MAX_VALUE).length;
+const maxRmeWidth = rmeFormat.format(MAX_RME).length;
+
+/**
+ * Creates a formatter of report lines. It only produces text, so it doesn't depend on the stream the report is
+ * printed to.
+ */
+export function createFormatter(options: FormatterOptions = {}): Formatter {
+  const {
+    applyStyle = (_textRole, text) => text,
+    padding = '  ',
+    columnSeparator = ' │ ',
+    warmupSymbol = '●',
+    successSymbol = '✓',
+    errorSymbol = '✗',
+    progressSymbols = ['○', '◔', '◑', '◕', '●'],
+    testColumnName = 'Test',
+    durationColumnName = 'Speed',
+    memoryColumnName = 'Memory',
+  } = options;
+
+  const symbolWidth = [successSymbol, errorSymbol, warmupSymbol, ...progressSymbols].reduce(
+    (width, symbol) => Math.max(width, symbol.length),
+    0
+  );
+
+  const styledColumnSeparator = applyStyle('column_separator', columnSeparator);
+
+  // Status lines have no separators, but their parts are aligned with columns of results
+  const blankColumnSeparator = ' '.repeat(columnSeparator.length);
+
+  const durationColumnWidth = Math.max(durationColumnName.length, getSummaryWidth(DURATION_UNIT));
+
+  const durationColumnPadding = ' '.repeat(durationColumnWidth - getSummaryWidth(DURATION_UNIT));
+
+  const emptyColumns = styledColumnSeparator + ' '.repeat(durationColumnWidth) + styledColumnSeparator;
+
+  function getTestNameStart(depth: number): number {
+    return padding.length * depth + symbolWidth + 1;
+  }
+
+  function formatMeasurement(value: number, unit: string): string {
+    let unitLabel = ' ' + unit + ' ';
+
+    if (value > MAX_VALUE) {
+      value /= 1_000;
+      unitLabel = ' k' + unit;
+    }
+
+    if (value > MAX_VALUE) {
+      value /= 1_000;
+      unitLabel = ' M' + unit;
+    }
+
+    if (value > MAX_VALUE) {
+      value /= 1_000;
+      unitLabel = ' G' + unit;
+    }
+
+    const valueLabel = decimalFormat.format(value).padStart(maxDecimalWidth);
+
+    return (
+      applyStyle('number_integer', valueLabel.slice(0, -3)) +
+      applyStyle('number_fraction', valueLabel.slice(-3)) +
+      unitLabel
+    );
+  }
+
+  function formatRme(rme: number): string {
+    const rmeLabel = Number.isNaN(rme) ? 'n/a' : rmeFormat.format(rme);
+
+    // The margin of error rounds to more than MAX_RME, so the value is unreliable
+    if (rmeLabel.length > maxRmeWidth) {
+      return applyStyle('rme', ' ± ') + applyStyle('excessive_rme', '≥100%'.padStart(maxRmeWidth));
+    }
+
+    return applyStyle('rme', ' ± ' + rmeLabel.padStart(maxRmeWidth));
+  }
+
+  function formatSummary(summary: HistogramSummary, value: number, unit: string): string {
+    if (summary.size !== 0) {
+      return formatMeasurement(value, unit) + formatRme(summary.rme);
+    }
+
+    return applyStyle(
+      'not_available',
+      'n/a'.padStart(maxDecimalWidth) + ' '.repeat(getSummaryWidth(unit) - maxDecimalWidth)
+    );
+  }
+
+  function formatMeasureIndex(measureIndex: number, measureCount: number): string {
+    if (measureCount === 1) {
+      return '';
+    }
+
+    const measureIndexLabel = integerFormat.format(measureIndex + 1) + '/' + integerFormat.format(measureCount);
+
+    return applyStyle('measure_index', measureIndexLabel);
+  }
+
+  function formatTestColumn(params: FormatTestStartParams, textRole: TextRole, symbol: string): string {
+    const { depth, testName, testColumnWidth } = params;
+
+    return (
+      padding.repeat(depth) +
+      applyStyle(textRole, symbol.padEnd(symbolWidth)) +
+      ' ' +
+      testName.padEnd(testColumnWidth - getTestNameStart(depth))
+    );
+  }
+
+  return {
+    getTestColumnWidth(lines) {
+      let testColumnWidth = testColumnName.length;
+
+      for (const line of lines) {
+        const nameStart = line.kind === 'test' ? getTestNameStart(line.depth) : padding.length * line.depth;
+
+        testColumnWidth = Math.max(testColumnWidth, nameStart + line.name.length);
+      }
+
+      return testColumnWidth;
+    },
+
+    formatHeader(testColumnWidth) {
+      return (
+        applyStyle('column_name', testColumnName.padEnd(testColumnWidth)) +
+        styledColumnSeparator +
+        applyStyle('column_name', durationColumnName.padEnd(durationColumnWidth)) +
+        styledColumnSeparator +
+        applyStyle('column_name', memoryColumnName)
+      );
+    },
+
+    formatEmptyLine(testColumnWidth) {
+      return ' '.repeat(testColumnWidth) + emptyColumns;
+    },
+
+    formatDescribeStart(params) {
+      const { depth, name, testColumnWidth } = params;
+
+      return (
+        padding.repeat(depth) +
+        applyStyle('describe_name', name.padEnd(testColumnWidth - padding.length * depth)) +
+        emptyColumns
+      );
+    },
+
+    formatTestStart(params) {
+      return formatTestColumn(params, 'progress_symbol', progressSymbols[0]) + padding;
+    },
+
+    formatWarmupStart(params) {
+      const { measureIndex, measureCount } = params;
+
+      return (
+        formatTestColumn(params, 'warmup_symbol', warmupSymbol) +
+        blankColumnSeparator +
+        formatMeasureIndex(measureIndex, measureCount) +
+        padding
+      );
+    },
+
+    formatProgress(params) {
+      const { measureIndex, measureCount, percentage } = params;
+
+      const progressSymbol = progressSymbols[Math.trunc(percentage * (progressSymbols.length - 1))];
+
+      return (
+        formatTestColumn(params, 'progress_symbol', progressSymbol) +
+        blankColumnSeparator +
+        formatMeasureIndex(measureIndex, measureCount) +
+        applyStyle('progress_percentage', progressFormat.format(percentage).padStart(5))
+      );
+    },
+
+    formatTestEnd(params) {
+      const { isFailed, durationSummary, memorySummary } = params;
+
+      // Durations are in milliseconds
+      const hz = 1_000 / durationSummary.mean;
+
+      return (
+        (isFailed
+          ? formatTestColumn(params, 'error_symbol', errorSymbol)
+          : formatTestColumn(params, 'success_symbol', successSymbol)) +
+        styledColumnSeparator +
+        formatSummary(durationSummary, hz, DURATION_UNIT) +
+        durationColumnPadding +
+        styledColumnSeparator +
+        formatSummary(memorySummary, memorySummary.mean, MEMORY_UNIT)
+      );
+    },
+
+    formatError(errorMessage) {
+      return applyStyle('error_message', errorMessage);
+    },
+  };
+}
+
+/**
+ * Returns the width of a value with its unit and margin of error.
+ */
+function getSummaryWidth(unit: string): number {
+  // A unit label is a space, a prefix and the unit, or the unit with a space on each side
+  return maxDecimalWidth + ' k'.length + unit.length + ' ± '.length + maxRmeWidth;
+}

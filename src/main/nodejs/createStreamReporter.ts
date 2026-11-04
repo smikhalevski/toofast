@@ -1,17 +1,19 @@
 import rl from 'readline';
 import { type InspectColor, styleText } from 'util';
-import type { WorkerEvent } from '../runner.ts';
-import { createFormatter, type Style } from './createFormatter.ts';
+import type { Block, Reporter } from '../runner.ts';
+import { createFormatter, type TestColumnLine, type TextRole } from './createFormatter.ts';
 
 /**
- * Colors and modifiers of text styles. They're applied only if the stream supports colors.
+ * Colors and modifiers of text roles. They're applied only if the stream supports colors.
  */
-const styleColors: Record<Style, InspectColor | InspectColor[]> = {
+const textRoleColors: Record<TextRole, InspectColor | InspectColor[]> = {
+  column_name: 'dim',
+  column_separator: 'dim',
   describe_name: 'bold',
   warmup_symbol: 'yellow',
   progress_symbol: 'dim',
   progress_percentage: 'dim',
-  measure_index: 'gray', // 2/5
+  measure_index: 'gray', // For example, 2/5
   success_symbol: 'green',
   error_symbol: 'red',
   error_message: 'red',
@@ -19,36 +21,8 @@ const styleColors: Record<Style, InspectColor | InspectColor[]> = {
   number_fraction: ['dim', 'yellow'],
   not_available: 'dim',
   rme: 'dim',
+  excessive_rme: 'red',
 };
-
-export interface Reporter {
-  /**
-   * Prints the name of a describe block and indents the output that follows.
-   */
-  printDescribeStart(name: string): void;
-
-  /**
-   * Removes the indent of the describe block that was started last.
-   */
-  printDescribeEnd(): void;
-
-  /**
-   * Prints the pending status of a test.
-   *
-   * @param name The name of the test, padded to align results of sibling tests.
-   */
-  printTestStart(name: string): void;
-
-  /**
-   * Prints the progress or the result of the test that was started last.
-   */
-  printTestEvent(event: WorkerEvent): void;
-
-  /**
-   * Prints an error that doesn't belong to a test, for example, an error thrown by a describe block or a test file.
-   */
-  printError(errorMessage: string): void;
-}
 
 /**
  * Creates a reporter that prints test results.
@@ -58,13 +32,11 @@ export interface Reporter {
  */
 export function createStreamReporter(stream: NodeJS.WriteStream = process.stdout): Reporter {
   const formatter = createFormatter({
-    applyStyle: (style, text) => styleText(styleColors[style], text, { stream }),
+    applyStyle: (textRole, text) => styleText(textRoleColors[textRole], text, { stream }),
   });
 
-  let depth = 0;
+  let testColumnWidth = 0;
   let hasMargin = false;
-  let testName = '';
-  let testErrorMessages: string[] = [];
 
   function print(text: string): void {
     stream.write(text);
@@ -84,86 +56,150 @@ export function createStreamReporter(stream: NodeJS.WriteStream = process.stdout
     }
   }
 
+  function printError(errorMessage: string): void {
+    clearLine();
+    print(formatter.formatError(errorMessage) + '\n');
+
+    hasMargin = true;
+  }
+
   return {
-    printDescribeStart(name) {
-      print('\n' + formatter.formatDescribeStart({ depth, name }) + '\n');
+    onTestModulesCollected(testModules) {
+      const lines: TestColumnLine[] = [];
+
+      for (const testModule of testModules) {
+        getTestColumnLines(testModule.blocks, lines);
+      }
+
+      // Names of columns are printed only if there are lines to align to them, for example, a describe block that has
+      // thrown and has no tests
+      if (lines.length === 0) {
+        return;
+      }
+
+      testColumnWidth = formatter.getTestColumnWidth(lines);
+
+      print(formatter.formatHeader(testColumnWidth) + '\n');
+    },
+
+    onTestModuleStart(testModule) {
+      if (testModule.errorMessage !== null) {
+        printError(testModule.errorMessage);
+      }
+    },
+
+    onTestModuleEnd() {},
+
+    onDescribeStart(block) {
+      print(formatter.formatEmptyLine(testColumnWidth) + '\n');
+
+      print(formatter.formatDescribeStart({ depth: getDepth(block), name: block.name, testColumnWidth }) + '\n');
 
       hasMargin = false;
-      ++depth;
+
+      if (block.errorMessage !== null) {
+        printError(block.errorMessage);
+      }
     },
 
-    printDescribeEnd() {
+    onDescribeEnd() {
       hasMargin = true;
-      --depth;
     },
 
-    printTestStart(name) {
-      testName = name;
-      testErrorMessages = [];
-
+    onTestStart(block) {
       if (hasMargin) {
-        print('\n');
+        print(formatter.formatEmptyLine(testColumnWidth) + '\n');
       }
-      printStatus(formatter.formatTestStart({ depth, testName }));
+
+      printStatus(formatter.formatTestStart({ depth: getDepth(block), testName: block.name, testColumnWidth }));
 
       hasMargin = false;
     },
 
-    printTestEvent(event) {
-      switch (event.type) {
-        case 'warmup_started':
-          printStatus(
-            formatter.formatWarmupStarted({
-              depth,
-              testName,
-              measureIndex: event.measureIndex,
-              measureCount: event.measureCount,
-            })
-          );
-          break;
+    onWarmupStart(params) {
+      const { block, measureIndex, measureCount } = params;
 
-        case 'progress_updated':
-          printStatus(
-            formatter.formatProgressUpdated({
-              depth,
-              testName,
-              measureIndex: event.measureIndex,
-              measureCount: event.measureCount,
-              percentage: event.percentage,
-            })
-          );
-          break;
-
-        case 'error_caught':
-          testErrorMessages.push(event.errorMessage);
-          break;
-
-        case 'test_ended':
-          clearLine();
-          print(
-            formatter.formatTestEnded({
-              depth,
-              testName,
-              isFailed: testErrorMessages.length !== 0,
-              durationSummary: event.durationSummary,
-              memorySummary: event.memorySummary,
-            }) + '\n'
-          );
-
-          for (const errorMessage of testErrorMessages) {
-            print(formatter.formatError(errorMessage) + '\n');
-          }
-
-          hasMargin = testErrorMessages.length !== 0;
-          break;
-      }
+      printStatus(
+        formatter.formatWarmupStart({
+          depth: getDepth(block),
+          testName: block.name,
+          testColumnWidth,
+          measureIndex,
+          measureCount,
+        })
+      );
     },
 
-    printError(errorMessage) {
-      clearLine();
-      print(formatter.formatError(errorMessage) + '\n');
+    onProgress(params) {
+      const { block, measureIndex, measureCount, percentage } = params;
 
-      hasMargin = true;
+      printStatus(
+        formatter.formatProgress({
+          depth: getDepth(block),
+          testName: block.name,
+          testColumnWidth,
+          measureIndex,
+          measureCount,
+          percentage,
+        })
+      );
+    },
+
+    onTestEnd(params) {
+      const { block, durationSummary, memorySummary, errorMessages } = params;
+
+      clearLine();
+
+      print(
+        formatter.formatTestEnd({
+          depth: getDepth(block),
+          testName: block.name,
+          testColumnWidth,
+          isFailed: errorMessages.length !== 0,
+          durationSummary,
+          memorySummary,
+        }) + '\n'
+      );
+
+      for (const errorMessage of errorMessages) {
+        print(formatter.formatError(errorMessage) + '\n');
+      }
+
+      hasMargin = errorMessages.length !== 0;
+    },
+
+    onError(errorMessage) {
+      printError(errorMessage);
     },
   };
+}
+
+/**
+ * Returns the number of describe blocks that enclose the block.
+ */
+function getDepth(block: Block): number {
+  // The path has an index for each enclosing describe block, and one for the block itself
+  return block.path.length - 1;
+}
+
+/**
+ * Returns lines that show names of describe blocks and tests in the test column, including those of nested blocks.
+ *
+ * @param blocks The blocks to show.
+ * @param lines The array to which lines are added, and which is returned.
+ */
+function getTestColumnLines(blocks: readonly Block[], lines: TestColumnLine[] = []): TestColumnLine[] {
+  for (const block of blocks) {
+    lines.push({
+      kind: block.kind,
+      depth: getDepth(block),
+      name: block.name,
+    });
+
+    if (block.kind === 'describe') {
+      getTestColumnLines(block.children, lines);
+    }
+  }
+
+  return lines;
 }

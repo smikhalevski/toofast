@@ -1,4 +1,4 @@
-import { appendNode, getCurrentNode, type HookType, type Node } from './runner.ts';
+import { appendChild, getCurrentNode, type HookType, type Node } from './runner.ts';
 import { assert, isObject, isString } from './utils.ts';
 
 /**
@@ -19,8 +19,8 @@ export interface TestOptions {
   measureTimeout?: number;
 
   /**
-   * The relative margin of error at which the measure stops, between 0 and 1. For example, 0.05 stops the measure when
-   * the mean call duration is known within ±5% at 95% confidence.
+   * The relative margin of error at which the measure stops, between `0` and `1`. For example, `0.05` stops the measure
+   * when the mean call duration is known within ±5% at 95% confidence.
    *
    * @default 0.05
    */
@@ -38,7 +38,9 @@ export interface TestOptions {
   /**
    * The maximum number of calls during warmup. V8 optimizes a function after it has been called many times, so warmup
    * keeps slow unoptimized calls out of the results. Warmup is also limited by {@link batchTimeout} and
-   * {@link maxBatchIterationCount}. Set to 0 to skip warmup.
+   * {@link maxBatchIterationCount}.
+   *
+   * Set to `0` to skip warmup.
    *
    * @default 10_000
    */
@@ -81,7 +83,9 @@ export interface TestOptions {
 
   /**
    * The maximum number of memory samples in a batch. A memory sample is an extra call after a loop, which measures how
-   * many bytes the callback allocates instead of how long it takes. Set to 0 to skip measuring memory.
+   * many bytes the callback allocates instead of how long it takes.
+   *
+   * Set to `0` to skip measuring memory.
    *
    * @default 10
    */
@@ -215,11 +219,11 @@ export function afterIteration(hook: HookCallback): void {
 }
 
 /**
- * Declares a group of tests. Groups can be nested.
+ * Declares a describe block, which groups tests. Describe blocks can be nested.
  *
- * @param name The name of the group. Test name patterns match names of its tests prefixed with it, for example,
- * "factorial.of 42".
- * @param callback Declares tests, nested groups and hooks. Can be async.
+ * @param name The name of the describe block. Test name patterns match names of its tests prefixed with it, for
+ * example, `factorial.of 42`.
+ * @param callback Declares tests, nested describe blocks and hooks. Can be async.
  * @example
  * describe('factorial', () => {
  *   test('of 42', () => {
@@ -230,12 +234,12 @@ export function afterIteration(hook: HookCallback): void {
 export function describe(name: string, callback: () => PromiseLike<void> | void): void;
 
 /**
- * Declares a group of tests with options that apply to all tests in the group. Groups can be nested.
+ * Declares a describe block with options that apply to all of its tests. Describe blocks can be nested.
  *
- * @param name The name of the group. Test name patterns match names of its tests prefixed with it, for example,
- * "factorial.of 42".
- * @param options Test options of all tests in the group.
- * @param callback Declares tests, nested groups and hooks. Can be async.
+ * @param name The name of the describe block. Test name patterns match names of its tests prefixed with it, for
+ * example, `factorial.of 42`.
+ * @param options Test options of all tests in the describe block.
+ * @param callback Declares tests, nested describe blocks and hooks. Can be async.
  */
 export function describe(name: string, options: TestOptions, callback: () => PromiseLike<void> | void): void;
 
@@ -248,7 +252,7 @@ export function describe(name: string, arg1: unknown, arg2?: unknown): void {
 
   const { options, callback } = parseBlockArgs(name, arg1, arg2);
 
-  appendNode(parent, {
+  appendChild(parent, {
     kind: 'describe',
     name,
     testOptions: options as TestOptions,
@@ -288,7 +292,7 @@ export function test(name: string, arg1: unknown, arg2?: unknown): void {
 
   const { options, callback } = parseBlockArgs(name, arg1, arg2);
 
-  appendNode(parent, {
+  appendChild(parent, {
     kind: 'test',
     name,
     testOptions: options as TestOptions,
@@ -345,7 +349,7 @@ export function measure(arg0: unknown, arg1?: unknown): void {
   const { beforeWarmup, afterWarmup, beforeBatch, afterBatch, beforeIteration, afterIteration, ...testOptions } =
     options as MeasureOptions;
 
-  const node = appendNode(parent, {
+  const node = appendChild(parent, {
     kind: 'measure',
     name: '',
     testOptions,
@@ -405,7 +409,7 @@ function addMeasureHook(functionName: string, type: HookType, callback: HookCall
 }
 
 /**
- * Adds a hook to the node, unless the callback is undefined.
+ * Adds a hook to the node, unless the callback is `undefined`.
  */
 function addHook(node: Node, type: HookType, callback: HookCallback | undefined): void {
   if (callback === undefined) {

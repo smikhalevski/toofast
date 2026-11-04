@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseArgs } from 'util';
 import type { TestOptions } from '../index.ts';
-import { toValidatedTestOptions } from '../runner.ts';
+import { resolveTestOptions } from '../runner.ts';
 import { assert, getErrorMessage, globToRegExp, isArrayOf, isObject, isString } from '../utils.ts';
 
 const CONFIG_FILE = 'toofast.json';
@@ -29,8 +29,8 @@ export interface Config {
   testFiles: string[];
 
   /**
-   * Patterns of names of tests to run. If empty, all tests run. A test name is prefixed with names of enclosing describe
-   * blocks, separated by dots.
+   * Patterns of names of tests to run. If empty, all tests run. A test name is prefixed with names of enclosing
+   * describe blocks, separated by dots.
    */
   testNamePatterns: RegExp[];
 
@@ -82,7 +82,7 @@ export function resolveConfig(args = process.argv.slice(2), cwd = process.cwd())
     setupFiles: globFiles(userConfig.setupFilePatterns, configDir),
     testFiles: globFiles(userConfig.testFilePatterns, configDir, EXCLUDE_PATTERNS),
     testNamePatterns: positionals.map(globToRegExp),
-    testOptions: toValidatedTestOptions(userConfig.testOptions),
+    testOptions: resolveTestOptions(userConfig.testOptions),
   };
 }
 
@@ -97,7 +97,7 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   const config = parseConfig(fs.readFileSync(configFile, 'utf8'), configPath);
 
-  assert(isObject(config), 'Config file must export an object: ' + configPath);
+  assert(isObject(config), 'Config must be an object: ' + configPath);
 
   const {
     $schema,

@@ -10,8 +10,6 @@ import {
   sleep,
 } from './utils.ts';
 
-export type NodeKind = 'test_suite' | 'describe' | 'test' | 'measure';
-
 export type HookType =
   | 'before_each'
   | 'after_each'
@@ -26,6 +24,8 @@ export interface Hook {
   type: HookType;
   callback: HookCallback;
 }
+
+export type NodeKind = 'test_suite' | 'describe' | 'test' | 'measure';
 
 /**
  * A node of the tree that a test file declares: the test suite at the root, describe blocks, tests and measures.
@@ -45,12 +45,50 @@ export interface Node {
 }
 
 /**
- * A describe block or a test that a worker has collected from a test file. The main process prints blocks and runs
+ * A describe block or a test that a worker has collected from a test file. The main process reports blocks and runs
  * each test in a new worker.
  */
-export type Block =
-  | { kind: 'describe'; name: string; path: number[]; children: Block[]; errorMessage: string | null }
-  | { kind: 'test'; name: string; path: number[] };
+export type Block = DescribeBlock | TestBlock;
+
+export interface DescribeBlock {
+  kind: 'describe';
+  name: string;
+
+  /**
+   * Indices of nodes on the way from the test suite to the describe block.
+   */
+  path: number[];
+
+  children: Block[];
+
+  /**
+   * The error that the describe block has thrown, or `null` if its children were collected.
+   */
+  errorMessage: string | null;
+}
+
+export interface TestBlock {
+  kind: 'test';
+  name: string;
+
+  /**
+   * Indices of nodes on the way from the test suite to the test. The worker that runs the test finds it by this path.
+   */
+  path: number[];
+}
+
+/**
+ * A test file and the describe blocks and tests that it declares.
+ */
+export interface TestModule {
+  testFile: string;
+  blocks: Block[];
+
+  /**
+   * The error that the test file has thrown when it was imported, or `null` if its blocks were collected.
+   */
+  errorMessage: string | null;
+}
 
 /**
  * A job that the main process sends to a new worker. The worker imports setup files and the test file, and then runs
@@ -61,8 +99,7 @@ export type WorkerJob =
   | { type: 'run_test'; setupFiles: string[]; testFile: string; testOptions: TestOptions; testPath: number[] };
 
 /**
- * A message from a worker to the main process. The last message of a job is blocks_collected, test_ended or
- * job_failed.
+ * An event of a job that runs in a worker. The last event of a job is `blocks_collected`, `test_ended` or `job_failed`.
  */
 export type WorkerEvent =
   | { type: 'blocks_collected'; blocks: Block[] }
@@ -82,6 +119,94 @@ export interface TestResult {
   memorySummary: HistogramSummary;
 }
 
+export interface WarmupStartParams {
+  block: TestBlock;
+
+  /**
+   * The index of the measure among measures of the test.
+   */
+  measureIndex: number;
+
+  /**
+   * The number of measures of the test.
+   */
+  measureCount: number;
+}
+
+export interface ProgressParams extends WarmupStartParams {
+  /**
+   * The progress of the measure, between `0` and `1`.
+   */
+  percentage: number;
+}
+
+export interface TestEndParams extends TestResult {
+  block: TestBlock;
+
+  /**
+   * Errors that the test has thrown, and the error that has stopped its worker, if any. The test has failed if there
+   * are any.
+   */
+  errorMessages: readonly string[];
+}
+
+/**
+ * Receives events of a test run, for example, to print results.
+ */
+export interface Reporter {
+  /**
+   * Called once after describe blocks and tests of all test files were collected, before tests run.
+   */
+  onTestModulesCollected(testModules: readonly TestModule[]): void;
+
+  /**
+   * Called before tests of a test module run. A test module whose test file has thrown an error when it was imported
+   * has no tests.
+   */
+  onTestModuleStart(testModule: TestModule): void;
+
+  /**
+   * Called after tests of a test module have run.
+   */
+  onTestModuleEnd(testModule: TestModule): void;
+
+  /**
+   * Called before tests of a describe block run. A describe block that has thrown an error has no tests.
+   */
+  onDescribeStart(block: DescribeBlock): void;
+
+  /**
+   * Called after tests of a describe block have run.
+   */
+  onDescribeEnd(block: DescribeBlock): void;
+
+  /**
+   * Called before a test runs in a new worker.
+   */
+  onTestStart(block: TestBlock): void;
+
+  /**
+   * Called when a measure of the test starts its warmup.
+   */
+  onWarmupStart(params: WarmupStartParams): void;
+
+  /**
+   * Called when the progress of a measure changes after warmup.
+   */
+  onProgress(params: ProgressParams): void;
+
+  /**
+   * Called after a test has ended, even if its worker has exited before the test ended.
+   */
+  onTestEnd(params: TestEndParams): void;
+
+  /**
+   * Called with an error that doesn't belong to a test module, a describe block or a test, for example, if no tests
+   * are found.
+   */
+  onError(errorMessage: string): void;
+}
+
 const defaultTestOptions: Required<TestOptions> = {
   measureTimeout: 10_000,
   targetRme: 0.05,
@@ -97,26 +222,22 @@ const defaultTestOptions: Required<TestOptions> = {
 /**
  * Validates test options and fills in the options that aren't set. Throws if an option is unknown or invalid.
  *
- * @param testOptions The options to validate.
- * @param parentTestOptions The options that fill in the options that aren't set.
+ * @param options The options to validate.
+ * @param defaultOptions The options that fill in the options that aren't set.
  */
-export function toValidatedTestOptions(
-  testOptions: TestOptions,
-  parentTestOptions = defaultTestOptions
-): Required<TestOptions> {
-  // An option that is explicitly undefined is inherited too
+export function resolveTestOptions(options: TestOptions, defaultOptions = defaultTestOptions): Required<TestOptions> {
   const {
-    measureTimeout = parentTestOptions.measureTimeout,
-    targetRme = parentTestOptions.targetRme,
-    minBatchCount = parentTestOptions.minBatchCount,
-    maxWarmupBatchIterationCount = parentTestOptions.maxWarmupBatchIterationCount,
-    maxBatchIterationCount = parentTestOptions.maxBatchIterationCount,
-    batchTimeout = parentTestOptions.batchTimeout,
-    batchPauseDuration = parentTestOptions.batchPauseDuration,
-    minLoopDuration = parentTestOptions.minLoopDuration,
-    maxBatchMemorySampleCount = parentTestOptions.maxBatchMemorySampleCount,
+    measureTimeout = defaultOptions.measureTimeout,
+    targetRme = defaultOptions.targetRme,
+    minBatchCount = defaultOptions.minBatchCount,
+    maxWarmupBatchIterationCount = defaultOptions.maxWarmupBatchIterationCount,
+    maxBatchIterationCount = defaultOptions.maxBatchIterationCount,
+    batchTimeout = defaultOptions.batchTimeout,
+    batchPauseDuration = defaultOptions.batchPauseDuration,
+    minLoopDuration = defaultOptions.minLoopDuration,
+    maxBatchMemorySampleCount = defaultOptions.maxBatchMemorySampleCount,
     ...unknownOptions
-  } = testOptions;
+  } = options;
 
   const unknownOptionNames = Object.keys(unknownOptions);
 
@@ -157,25 +278,24 @@ export function toValidatedTestOptions(
 }
 
 /**
- * Creates the root node of a test file. Throws if test options are invalid.
+ * Creates the root node of a test file.
  */
-export function createTestSuite(testOptions: TestOptions): Node {
+export function createTestSuiteNode(testOptions: TestOptions): Node {
   return {
     kind: 'test_suite',
     name: '',
     parent: null,
     children: [],
     hooks: [],
-    testOptions: toValidatedTestOptions(testOptions),
+    testOptions: resolveTestOptions(testOptions),
     callback: noop,
   };
 }
 
 /**
  * Creates a node and appends it to the parent. Test options that the child doesn't set are inherited from the parent.
- * Throws if test options are invalid.
  */
-export function appendNode(
+export function appendChild(
   parent: Node,
   child: { kind: NodeKind; name: string; testOptions: TestOptions; callback: () => unknown }
 ): Node {
@@ -184,7 +304,7 @@ export function appendNode(
     parent,
     children: [],
     hooks: [],
-    testOptions: toValidatedTestOptions(child.testOptions, parent.testOptions),
+    testOptions: resolveTestOptions(child.testOptions, parent.testOptions),
   };
 
   parent.children.push(node);
@@ -202,35 +322,34 @@ export async function collectBlocks(node: Node, path: number[] = []): Promise<Bl
   const blocks: Block[] = [];
 
   for (let i = 0; i < node.children.length; ++i) {
-    const child = node.children[i];
+    const childNode = node.children[i];
     const childPath = path.concat(i);
 
-    if (child.kind === 'test') {
+    if (childNode.kind === 'test') {
       blocks.push({
         kind: 'test',
-        name: child.name,
+        name: childNode.name,
         path: childPath,
       });
-
       continue;
     }
 
     let errorMessage: string | null = null;
 
-    setCurrentNode(child);
+    setCurrentNode(childNode);
 
     try {
-      await child.callback();
+      await childNode.callback();
     } catch (error) {
       errorMessage = getErrorStackOrMessage(error);
     }
 
     blocks.push({
       kind: 'describe',
-      name: child.name,
+      name: childNode.name,
       path: childPath,
-      // Blocks of a describe that has thrown are never run
-      children: errorMessage === null ? await collectBlocks(child, childPath) : [],
+      // Blocks of a describe block that has thrown are never run
+      children: errorMessage === null ? await collectBlocks(childNode, childPath) : [],
       errorMessage,
     });
   }
@@ -269,36 +388,29 @@ export function pruneBlocks(blocks: Block[], testNamePatterns: RegExp[], separat
 }
 
 /**
- * Returns the number of tests in blocks, including tests in nested describe blocks.
+ * Returns tests in blocks, including tests in nested describe blocks, in the order they are declared.
+ *
+ * @param blocks The blocks to search.
+ * @param testBlocks The array to which tests are added, and which is returned.
  */
-export function getTestCount(blocks: Block[]): number {
-  let testCount = 0;
-
-  for (const block of blocks) {
-    testCount += block.kind === 'test' ? 1 : getTestCount(block.children);
-  }
-
-  return testCount;
-}
-
-/**
- * Returns the length of the longest test name in blocks. Tests in nested describe blocks aren't counted, since only
- * results of sibling tests are aligned.
- */
-export function getMaxTestNameLength(blocks: Block[]): number {
-  let maxLength = 0;
-
+export function getTestBlocks(blocks: Block[], testBlocks: TestBlock[] = []): TestBlock[] {
   for (const block of blocks) {
     if (block.kind === 'test') {
-      maxLength = Math.max(maxLength, block.name.length);
+      testBlocks.push(block);
+      continue;
     }
+
+    getTestBlocks(block.children, testBlocks);
   }
 
-  return maxLength;
+  return testBlocks;
 }
 
 export interface RunTestParams {
-  testSuite: Node;
+  /**
+   * The root node, in which the test is looked up by {@link RunTestParams.testPath}.
+   */
+  rootNode: Node;
 
   /**
    * Indices of nodes on the way from the test suite to the test.
@@ -313,19 +425,19 @@ export interface RunTestParams {
 /**
  * Runs the test at the path. Only callbacks of describe blocks on the path are called, so other blocks don't add
  * objects to the measured heap.
- *
- * Histograms of measures are summarized into the result of the test, see {@link summarizeHistograms}.
  */
 export async function runTest(params: RunTestParams): Promise<TestResult> {
-  const { testSuite, testPath, getMemoryUsed, sendMessage } = params;
+  const { rootNode, testPath, getMemoryUsed, sendMessage } = params;
 
   const durationHistograms: Histogram[] = [];
   const memoryHistograms: Histogram[] = [];
 
-  let node = testSuite;
+  let node = rootNode;
 
   for (const index of testPath) {
     node = node.children[index];
+
+    assert(node !== undefined, 'Test order must not change between invokations');
 
     if (node.kind === 'describe') {
       setCurrentNode(node);
@@ -333,8 +445,10 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
     }
   }
 
+  assert(node.kind === 'test', 'Test order must not change between invokations');
+
   try {
-    await runHooks(getHookCallbacks(node, 'before_each'));
+    await runHooks(getBeforeHookCallbacks(node, 'before_each'));
 
     setCurrentNode(node);
     await node.callback();
@@ -364,7 +478,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
 
   // Cleanup runs even if the test has failed
   try {
-    await runHooks(getReversedHookCallbacks(node, 'after_each'));
+    await runHooks(getAfterHookCallbacks(node, 'after_each'));
   } catch (error) {
     sendMessage({
       type: 'error_caught',
@@ -389,11 +503,12 @@ export interface RunMeasureParams {
 }
 
 /**
- * Warms up the callback of a measure node, and then measures it. Returns null if the callback has thrown.
+ * Warms up the callback of a measure node, and then measures it. Returns `null` if the callback has thrown.
  *
  * After warmup, the measure runs batches with a pause after each. A batch calls the callback in loops, and times each
  * loop with two timer reads, so the overhead of the timer is spread over many calls. Each batch adds its mean call
- * duration to the results. The measure stops when batches agree within targetRme, or when measureTimeout is reached.
+ * duration to the results. The measure stops when batches agree within {@link TestOptions.targetRme}, or when
+ * {@link TestOptions.measureTimeout} is reached.
  */
 export async function runMeasure(params: RunMeasureParams): Promise<MeasureResult | null> {
   const { node, measureIndex, measureCount, getMemoryUsed, sendMessage } = params;
@@ -413,10 +528,10 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   // Blocks and hooks can't be declared while the measure runs
   setCurrentNode(node);
 
-  const beforeBatchHooks = getHookCallbacks(node, 'before_batch');
-  const afterBatchHooks = getReversedHookCallbacks(node, 'after_batch');
-  const beforeIterationHooks = getHookCallbacks(node, 'before_iteration');
-  const afterIterationHooks = getReversedHookCallbacks(node, 'after_iteration');
+  const beforeBatchHooks = getBeforeHookCallbacks(node, 'before_batch');
+  const afterBatchHooks = getAfterHookCallbacks(node, 'after_batch');
+  const beforeIterationHooks = getBeforeHookCallbacks(node, 'before_iteration');
+  const afterIterationHooks = getAfterHookCallbacks(node, 'after_iteration');
 
   const durationHistogram = new Histogram();
   const memoryHistogram = new Histogram();
@@ -427,7 +542,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   let isLoopCalibrated = beforeIterationHooks.length !== 0 || afterIterationHooks.length !== 0;
 
   /**
-   * Calls the callback one iteration at a time until warmup is over. Returns false if the callback has thrown.
+   * Calls the callback one iteration at a time until warmup is over. Returns `false` if the callback has thrown.
    */
   async function runWarmupBatch(): Promise<boolean> {
     // Warmup is a batch, so batch options limit it too
@@ -450,7 +565,6 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
         type: 'error_caught',
         errorMessage: getErrorStackOrMessage(error),
       });
-
       return false;
     } finally {
       await runHooks(afterBatchHooks);
@@ -513,7 +627,6 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
         type: 'error_caught',
         errorMessage: getErrorStackOrMessage(error),
       });
-
       return null;
     } finally {
       await runHooks(afterBatchHooks);
@@ -544,7 +657,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       measureCount,
     });
 
-    await runHooks(getHookCallbacks(node, 'before_warmup'));
+    await runHooks(getBeforeHookCallbacks(node, 'before_warmup'));
 
     const isWarmedUp = await runWarmupBatch();
 
@@ -552,7 +665,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       return null;
     }
 
-    await runHooks(getReversedHookCallbacks(node, 'after_warmup'));
+    await runHooks(getAfterHookCallbacks(node, 'after_warmup'));
 
     // The pause lets the garbage collector run before the first batch
     await sleep(batchPauseDuration);
@@ -600,7 +713,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       };
     }
 
-    // Progress is reported in whole percents, since finer steps aren't displayed anyway
+    // Progress is reported in whole percents
     const nextPercentage = Math.trunc(Math.max(percentage, timeoutProgress, rmeProgress) * 100) / 100;
 
     if (percentage !== nextPercentage) {
@@ -632,7 +745,6 @@ function measureLoopDuration(callback: () => unknown, iterationCount: number): n
 
   const duration = performance.now() - timestamp;
 
-  // The first loop of a measure has a single iteration, so an async callback is detected after its first call
   assertSynchronous(result);
 
   return duration;
@@ -654,13 +766,14 @@ function assertSynchronous(result: unknown): void {
 }
 
 /**
- * Calls the callback once, and returns the number of bytes it has allocated, or null if the garbage collector has
+ * Calls the callback once, and returns the number of bytes it has allocated, or `null` if the garbage collector has
  * distorted the measurement.
  */
 function measureMemoryUsed(callback: () => unknown, getMemoryUsed: () => number): number | null {
   // Reading the heap size can allocate memory itself, so the heap growth around a noop is subtracted
   const probeMemoryUsed = measureHeapGrowth(noop, getMemoryUsed);
   const callbackMemoryUsed = measureHeapGrowth(callback, getMemoryUsed);
+
   const memoryUsed = callbackMemoryUsed - probeMemoryUsed;
 
   // The heap shrinks if the garbage collector runs. The difference is also negative if the probe has allocated more
@@ -685,21 +798,21 @@ function measureHeapGrowth(callback: () => unknown, getMemoryUsed: () => number)
  * Returns callbacks of hooks of the type that are registered on the node and its ancestors, in the order before-hooks
  * run: outer blocks first, and hooks of the same block in the order they were registered.
  */
-function getHookCallbacks(node: Node, type: HookType): HookCallback[] {
-  return getReversedHookCallbacks(node, type).reverse();
+function getBeforeHookCallbacks(node: Node, type: HookType): HookCallback[] {
+  return getAfterHookCallbacks(node, type).reverse();
 }
 
 /**
  * Returns callbacks of hooks of the type that are registered on the node and its ancestors, in the order after-hooks
  * run: inner blocks first, and hooks of the same block in reverse order of registration.
  */
-function getReversedHookCallbacks(node: Node, type: HookType): HookCallback[] {
+function getAfterHookCallbacks(node: Node, type: HookType): HookCallback[] {
   const callbacks: HookCallback[] = [];
 
-  for (let ancestor: Node | null = node; ancestor !== null; ancestor = ancestor.parent) {
-    for (let i = ancestor.hooks.length - 1; i >= 0; --i) {
-      if (ancestor.hooks[i].type === type) {
-        callbacks.push(ancestor.hooks[i].callback);
+  for (let ancestorNode: Node | null = node; ancestorNode !== null; ancestorNode = ancestorNode.parent) {
+    for (let i = ancestorNode.hooks.length - 1; i >= 0; --i) {
+      if (ancestorNode.hooks[i].type === type) {
+        callbacks.push(ancestorNode.hooks[i].callback);
       }
     }
   }
@@ -713,7 +826,7 @@ async function runHooks(callbacks: HookCallback[]): Promise<void> {
   }
 }
 
-let currentNode = createTestSuite({});
+let currentNode = createTestSuiteNode({});
 
 /**
  * Returns the node to which describe blocks, tests, measures and hooks are added when they are declared.
@@ -722,6 +835,9 @@ export function getCurrentNode(): Node {
   return currentNode;
 }
 
+/**
+ * Sets the node to which describe blocks, tests, measures and hooks are added when they are declared.
+ */
 export function setCurrentNode(node: Node): void {
   currentNode = node;
 }

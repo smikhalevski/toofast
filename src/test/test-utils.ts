@@ -2,24 +2,24 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { onTestFinished } from 'vitest';
-import { appendNode, createTestSuite, type Node, setCurrentNode } from '../main/runner.ts';
+import { appendChild, createTestSuiteNode, type Node, setCurrentNode } from '../main/runner.ts';
 import { noop } from '../main/utils.ts';
 
 /**
- * Creates a test suite and makes it the node to which describe blocks, tests and hooks are declared.
+ * Creates a test suite and makes it the node to which describe blocks, tests and hooks are added.
  */
 export function makeTestSuite(): Node {
-  const testSuite = createTestSuite({});
+  const testSuite = createTestSuiteNode({});
 
   setCurrentNode(testSuite);
   return testSuite;
 }
 
 /**
- * Creates a test in a new test suite and makes it the node to which measures and hooks are declared.
+ * Creates a test in a new test suite and makes it the node to which measures and hooks are added.
  */
 export function makeTestNode(): Node {
-  const testNode = appendNode(createTestSuite({}), { kind: 'test', name: 'aaa', testOptions: {}, callback: noop });
+  const testNode = appendChild(createTestSuiteNode({}), { kind: 'test', name: 'aaa', testOptions: {}, callback: noop });
 
   setCurrentNode(testNode);
   return testNode;

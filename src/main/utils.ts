@@ -1,7 +1,8 @@
 export function noop(): void {}
 
 /**
- * Throws an error with the message if the condition is false. Unlike the Node.js assert module, works on any platform.
+ * Throws an error with the message if the condition is `false`. Unlike the Node.js assert module, works on any
+ * platform.
  */
 export function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -30,7 +31,7 @@ export function isNonNegativeInteger(value: unknown): value is number {
 }
 
 /**
- * Returns true if the value is an object, but not an array.
+ * Returns `true` if the value is an object, but not an array.
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -49,7 +50,7 @@ export function isString(value: unknown): value is string {
 }
 
 /**
- * Converts a glob pattern, where "*" matches any characters, to a case-insensitive RegExp that matches the whole
+ * Converts a glob pattern, where `*` matches any characters, to a case-insensitive RegExp that matches the whole
  * string.
  */
 export function globToRegExp(pattern: string): RegExp {

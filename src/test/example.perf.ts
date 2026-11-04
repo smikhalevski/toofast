@@ -4,50 +4,50 @@ function factorial(x: number): number {
   return x === 0 ? 1 : x * factorial(x - 1);
 }
 
-describe('factorial', () => {
-  test('of 33', () => {
-    measure(() => {
-      factorial(33);
-    });
-  });
-
-  test('of 42', () => {
-    measure(() => {
-      factorial(42);
-    });
-  });
-});
+// describe('factorial', () => {
+//   test('of 33', () => {
+//     measure(() => {
+//       factorial(33);
+//     });
+//   });
+//
+//   test('of 42', () => {
+//     measure(() => {
+//       factorial(42);
+//     });
+//   });
+// });
 
 describe('describe 0', () => {
-  test('test 0.0', () => {
-    measure(() => {
-      factorial(42);
-    });
-  });
-
-  test('test 0.1', () => {
-    let str = [];
-    measure(() => {
-      if (str.length > 10000) {
-        str = [];
-      }
-      str.push({});
-    });
-  });
-
-  describe('describe 0.1', () => {
-    test('test 0.1.0 (error)', () => {
-      measure(() => {
-        throw new Error('Expected error');
-      });
-    });
-
-    test('test 0.1.1', () => {
-      measure(() => {
-        // noop
-      });
-    });
-  });
+  // test('test 0.0', () => {
+  //   measure(() => {
+  //     factorial(42);
+  //   });
+  // });
+  //
+  // test('test 0.1', () => {
+  //   let str = [];
+  //   measure(() => {
+  //     if (str.length > 10000) {
+  //       str = [];
+  //     }
+  //     str.push({});
+  //   });
+  // });
+  //
+  // describe('describe 0.1', () => {
+  //   test('test 0.1.0 (error)', () => {
+  //     measure(() => {
+  //       throw new Error('Expected error');
+  //     });
+  //   });
+  //
+  //   test('test 0.1.1', () => {
+  //     measure(() => {
+  //       // noop
+  //     });
+  //   });
+  // });
 
   describe('describe 0.2', () => {
     test('test 0.2.0 (stack overflow)', () => {

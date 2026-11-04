@@ -55,7 +55,7 @@ export class Histogram {
    * The unbiased sample variance. The sum of squared deviations from the mean is divided by {@link size} - 1, because
    * the mean is estimated from the same sample.
    *
-   * `NaN` if there are less than two values, since a single value doesn't show how much values vary.
+   * `NaN` if there are fewer than two values, since a single value doesn't show how much values vary.
    *
    * @see [Variance](https://en.wikipedia.org/wiki/Variance)
    */
@@ -64,7 +64,7 @@ export class Histogram {
   }
 
   /**
-   * The standard deviation, the square root of {@link variance}, or `NaN` if there are less than two values.
+   * The standard deviation, the square root of {@link variance}, or `NaN` if there are fewer than two values.
    *
    * @see [Standard deviation](https://en.wikipedia.org/wiki/Standard_deviation)
    */
@@ -84,7 +84,7 @@ export class Histogram {
 
   /**
    * The margin of error of the mean at 95% confidence, {@link sem} multiplied by the critical value of the
-   * t-distribution, or `NaN` if there are less than two values.
+   * t-distribution, or `NaN` if there are fewer than two values.
    *
    * @see [Margin of error](https://en.wikipedia.org/wiki/Margin_of_error)
    */
@@ -93,7 +93,7 @@ export class Histogram {
   }
 
   /**
-   * The margin of error relative to the mean, for example, `0.05` for ±5%, or `NaN` if there are less than two values.
+   * The margin of error relative to the mean, for example, `0.05` for ±5%, or `NaN` if there are fewer than two values.
    */
   get rme(): number {
     // All values are equal, so there's no error, even if the mean is 0
@@ -115,7 +115,8 @@ export class Histogram {
 }
 
 /**
- * Summarizes histograms of measures of different callbacks, for example, into the result of a test.
+ * Summarizes histograms of measures of different callbacks.
+ *
  * {@link HistogramSummary.mean} is the mean of means of histograms. Histograms without values are skipped.
  *
  * Histograms have equal weights, since a noisy measure runs more batches but must not outweigh others. The gap between
@@ -134,7 +135,6 @@ export function summarizeHistograms(histograms: readonly Histogram[]): Histogram
   let welchDenominator = 0;
 
   for (const histogram of histograms) {
-    // For example, the memory histogram of a measure that doesn't sample memory
     if (histogram.size === 0) {
       continue;
     }
@@ -176,21 +176,23 @@ export function summarizeHistograms(histograms: readonly Histogram[]): Histogram
 }
 
 /**
- * Returns the two-tailed critical value of the t-distribution at 95% confidence, or `NaN` if there are no degrees of
- * freedom.
- *
- * @param degreesOfFreedom An integer.
+ * Returns the two-tailed critical value of the t-distribution at 95% confidence.
  */
 function getCriticalValue(degreesOfFreedom: number): number {
+  if (degreesOfFreedom === 0 || Number.isNaN(degreesOfFreedom)) {
+    return NaN;
+  }
+
   // Beyond the table, values decrease slowly from 1.98 to 1.96, so the last value is used
-  return tTable[Math.min(degreesOfFreedom, tTable.length) - 1] ?? NaN;
+  return criticalValues[Math.min(degreesOfFreedom, criticalValues.length) - 1];
 }
 
 /**
- * Critical values of the t-distribution. The value at index i is for i + 1 degrees of freedom.
+ * Two-tailed critical values of the t-distribution at 95% confidence. The value at index `i` is for `i + 1` degrees of
+ * freedom.
  */
 // prettier-ignore
-const tTable = [
+const criticalValues = [
   12.7100, 4.3030, 3.1820, 2.7760, 2.5710, 2.4470, 2.3650, 2.3060,
    2.2620, 2.2280, 2.2010, 2.1790, 2.1600, 2.1450, 2.1310, 2.1200,
    2.1100, 2.1010, 2.0930, 2.0860, 2.0800, 2.0740, 2.0690, 2.0640,

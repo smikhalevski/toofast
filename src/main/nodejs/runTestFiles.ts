@@ -4,14 +4,15 @@ import { emptyHistogramSummary } from '../Histogram.ts';
 import type { TestOptions } from '../index.ts';
 import {
   type Block,
-  getMaxTestNameLength,
-  getTestCount,
+  getTestBlocks,
   pruneBlocks,
+  type Reporter,
+  type TestBlock,
+  type TestModule,
   type WorkerEvent,
   type WorkerJob,
 } from '../runner.ts';
 import { getErrorMessage } from '../utils.ts';
-import type { Reporter } from './createStreamReporter.ts';
 import type { Config } from './resolveConfig.ts';
 
 // Sources have the .ts extension, and the build has the .js extension
@@ -60,48 +61,89 @@ export interface RunTestFilesParams {
  * Runs tests in worker processes and exits. For each test file, a worker collects describe blocks and tests, and then
  * each test runs in a new worker.
  *
+ * Blocks of all test files are collected before tests run, so the reporter gets all of them in
+ * {@link Reporter.onTestModulesCollected}, for example, to align results of all tests.
+ *
  * If a test file can't be imported, or a worker exits before it finishes, the error is reported and other tests still
- * run. Exits with code 1 if there were errors or no tests.
+ * run. Exits with code `1` if there were errors or no tests.
  */
 export async function runTestFiles(params: RunTestFilesParams): Promise<void> {
   const { config, reporter } = params;
-  const { setupFiles, testFiles, testNamePatterns, testOptions } = config;
+  const { setupFiles, testOptions } = config;
 
-  let testCount = 0;
-  let errorCount = 0;
+  const testModules = await collectTestModules(config);
+  const testBlocks: TestBlock[] = [];
 
-  for (const testFile of testFiles) {
-    let blocks: Block[] = [];
-
-    try {
-      await runJobInWorker({ type: 'collect_blocks', setupFiles, testFile, testOptions }, event => {
-        if (event.type === 'blocks_collected') {
-          blocks = event.blocks;
-        }
-      });
-    } catch (error) {
-      reporter.printError(getErrorMessage(error));
-      errorCount++;
-      continue;
-    }
-
-    pruneBlocks(blocks, testNamePatterns, '.');
-
-    testCount += getTestCount(blocks);
-    errorCount += await runBlocks({ blocks, setupFiles, testFile, testOptions, reporter });
+  for (const testModule of testModules) {
+    getTestBlocks(testModule.blocks, testBlocks);
   }
 
-  if (testCount === 0 && errorCount === 0) {
-    // For example, test file patterns or test name patterns have a typo
-    reporter.printError('No tests found');
+  let errorCount = 0;
+
+  reporter.onTestModulesCollected(testModules);
+
+  for (const testModule of testModules) {
+    reporter.onTestModuleStart(testModule);
+
+    if (testModule.errorMessage !== null) {
+      errorCount++;
+    }
+
+    errorCount += await runBlocks(testModule.blocks, {
+      setupFiles,
+      testFile: testModule.testFile,
+      testOptions,
+      reporter,
+    });
+
+    reporter.onTestModuleEnd(testModule);
+  }
+
+  if (testBlocks.length === 0 && errorCount === 0) {
+    reporter.onError('No tests found');
     errorCount++;
   }
 
   process.exit(errorCount === 0 ? 0 : 1);
 }
 
+/**
+ * Collects describe blocks and tests of each test file in a new worker, and prunes tests whose names don't match test
+ * name patterns.
+ */
+async function collectTestModules(config: Config): Promise<TestModule[]> {
+  const { setupFiles, testFiles, testNamePatterns, testOptions } = config;
+
+  const testModules: TestModule[] = [];
+
+  for (const testFile of testFiles) {
+    const testModule: TestModule = {
+      testFile,
+      blocks: [],
+      errorMessage: null,
+    };
+
+    await runJobInWorker({ type: 'collect_blocks', setupFiles, testFile, testOptions }, event => {
+      switch (event.type) {
+        case 'blocks_collected':
+          testModule.blocks = event.blocks;
+          break;
+
+        case 'job_failed':
+          testModule.errorMessage = event.errorMessage;
+          break;
+      }
+    });
+
+    pruneBlocks(testModule.blocks, testNamePatterns, '.');
+
+    testModules.push(testModule);
+  }
+
+  return testModules;
+}
+
 interface RunBlocksParams {
-  blocks: Block[];
   setupFiles: string[];
   testFile: string;
   testOptions: TestOptions;
@@ -109,96 +151,123 @@ interface RunBlocksParams {
 }
 
 /**
- * Prints describe blocks and runs each test in a new worker. Returns the number of errors thrown by tests and describe
- * blocks.
+ * Runs each test in a new worker, and reports describe blocks and tests.
+ *
+ * Returns the number of errors thrown by tests and describe blocks.
  */
-async function runBlocks(params: RunBlocksParams): Promise<number> {
-  const { blocks, setupFiles, testFile, testOptions, reporter } = params;
-
-  // Results of sibling tests are aligned
-  const nameLength = getMaxTestNameLength(blocks);
+async function runBlocks(blocks: readonly Block[], params: RunBlocksParams): Promise<number> {
+  const { setupFiles, testFile, testOptions, reporter } = params;
 
   let errorCount = 0;
 
   for (const block of blocks) {
     if (block.kind === 'describe') {
-      reporter.printDescribeStart(block.name);
+      reporter.onDescribeStart(block);
 
       if (block.errorMessage !== null) {
-        reporter.printError(block.errorMessage);
         errorCount++;
       }
 
-      errorCount += await runBlocks({ ...params, blocks: block.children });
+      errorCount += await runBlocks(block.children, params);
 
-      reporter.printDescribeEnd();
+      reporter.onDescribeEnd(block);
       continue;
     }
 
-    reporter.printTestStart(block.name.padEnd(nameLength));
+    reporter.onTestStart(block);
 
-    try {
-      await runJobInWorker({ type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path }, event => {
-        if (event.type === 'error_caught') {
-          errorCount++;
-        }
-        reporter.printTestEvent(event);
-      });
-    } catch (error) {
-      // The worker didn't end the test, so the test ends here without results
-      reporter.printTestEvent({
-        type: 'error_caught',
-        errorMessage: getErrorMessage(error),
-      });
+    const errorMessages: string[] = [];
 
-      reporter.printTestEvent({
-        type: 'test_ended',
-        durationSummary: emptyHistogramSummary,
-        memorySummary: emptyHistogramSummary,
-      });
+    let durationSummary = emptyHistogramSummary;
+    let memorySummary = emptyHistogramSummary;
 
-      errorCount++;
-    }
+    await runJobInWorker({ type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path }, event => {
+      switch (event.type) {
+        case 'warmup_started':
+          reporter.onWarmupStart({
+            block,
+            measureIndex: event.measureIndex,
+            measureCount: event.measureCount,
+          });
+          break;
+
+        case 'progress_updated':
+          reporter.onProgress({
+            block,
+            measureIndex: event.measureIndex,
+            measureCount: event.measureCount,
+            percentage: event.percentage,
+          });
+          break;
+
+        case 'error_caught':
+        case 'job_failed':
+          errorMessages.push(event.errorMessage);
+          break;
+
+        case 'test_ended':
+          durationSummary = event.durationSummary;
+          memorySummary = event.memorySummary;
+          break;
+      }
+    });
+
+    errorCount += errorMessages.length;
+
+    reporter.onTestEnd({
+      block,
+      durationSummary,
+      memorySummary,
+      errorMessages,
+    });
   }
 
   return errorCount;
 }
 
 /**
- * Runs a job in a new worker. Rejects if the job fails, or if the worker exits before the job ends.
+ * Runs a job in a new worker, and resolves after the worker has exited.
+ *
+ * If the worker fails to start or exits before the job ends, the job ends with a `job_failed` event.
  */
 function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Test options can be Infinity, which JSON serialization would turn into null
+  return new Promise(resolve => {
     const worker = fork(WORKER_FILE, { execArgv: WORKER_EXEC_ARGV, serialization: 'advanced' });
 
-    // The job is sent over IPC, since the command line length is limited
     worker.send(job);
 
     let isJobEnded = false;
 
-    worker.on('message', (event: WorkerEvent) => {
-      if (event.type === 'job_failed') {
-        reject(new Error(event.errorMessage));
+    function handleJobEvent(event: WorkerEvent): void {
+      if (isJobEnded) {
         return;
       }
 
-      // The last message of a job that succeeded
-      if (event.type === 'blocks_collected' || event.type === 'test_ended') {
+      if (event.type === 'blocks_collected' || event.type === 'test_ended' || event.type === 'job_failed') {
         isJobEnded = true;
       }
 
       handleEvent(event);
+    }
+
+    worker.on('message', handleJobEvent);
+
+    worker.on('error', error => {
+      handleJobEvent({
+        type: 'job_failed',
+        errorMessage: getErrorMessage(error),
+      });
+
+      resolve();
     });
 
-    worker.on('error', reject);
-
     worker.on('close', exitCode => {
-      if (isJobEnded) {
-        resolve();
-      } else {
-        reject(new Error('Test process exited unexpectedly: ' + exitCode));
-      }
+      handleJobEvent({
+        type: 'job_failed',
+        errorMessage: 'Test worker exited unexpectedly: ' + exitCode,
+      });
+
+      resolve();
     });
   });
 }

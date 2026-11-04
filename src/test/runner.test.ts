@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import * as toofast from '../main/index.ts';
 import type { MeasureOptions } from '../main/index.ts';
 import {
-  appendNode,
+  appendChild,
   collectBlocks,
-  createTestSuite,
+  createTestSuiteNode,
   type Node,
   runMeasure,
   runTest,
-  toValidatedTestOptions,
+  resolveTestOptions,
 } from '../main/runner.ts';
 import { noop, sleep } from '../main/utils.ts';
 import { makeTestNode, makeTestSuite } from './test-utils.ts';
@@ -21,9 +21,9 @@ const fastOptions: MeasureOptions = {
   batchPauseDuration: 1,
 };
 
-describe('toValidatedTestOptions', () => {
+describe('resolveTestOptions', () => {
   test('applies default test options', () => {
-    expect(toValidatedTestOptions({})).toEqual({
+    expect(resolveTestOptions({})).toEqual({
       measureTimeout: 10_000,
       targetRme: 0.05,
       minBatchCount: 5,
@@ -37,37 +37,37 @@ describe('toValidatedTestOptions', () => {
   });
 
   test('throws if minBatchCount is not a positive integer', () => {
-    expect(() => toValidatedTestOptions({ minBatchCount: 0 })).toThrow('minBatchCount must be a positive integer');
+    expect(() => resolveTestOptions({ minBatchCount: 0 })).toThrow('minBatchCount must be a positive integer');
   });
 
   test('throws if maxBatchIterationCount is not a positive integer', () => {
-    expect(() => toValidatedTestOptions({ maxBatchIterationCount: 0 })).toThrow(
+    expect(() => resolveTestOptions({ maxBatchIterationCount: 0 })).toThrow(
       'maxBatchIterationCount must be a positive integer'
     );
   });
 
   test('throws if batchTimeout is not a positive integer', () => {
-    expect(() => toValidatedTestOptions({ batchTimeout: 0 })).toThrow('batchTimeout must be a positive integer');
+    expect(() => resolveTestOptions({ batchTimeout: 0 })).toThrow('batchTimeout must be a positive integer');
   });
 
   test('throws if batchPauseDuration is not a positive integer', () => {
-    expect(() => toValidatedTestOptions({ batchPauseDuration: 0 })).toThrow(
+    expect(() => resolveTestOptions({ batchPauseDuration: 0 })).toThrow(
       'batchPauseDuration must be a positive integer'
     );
   });
 
   test('throws if minLoopDuration is not a positive integer', () => {
-    expect(() => toValidatedTestOptions({ minLoopDuration: 0 })).toThrow('minLoopDuration must be a positive integer');
+    expect(() => resolveTestOptions({ minLoopDuration: 0 })).toThrow('minLoopDuration must be a positive integer');
   });
 
   test('throws if maxWarmupBatchIterationCount is not a non-negative integer', () => {
-    expect(() => toValidatedTestOptions({ maxWarmupBatchIterationCount: -1 })).toThrow(
+    expect(() => resolveTestOptions({ maxWarmupBatchIterationCount: -1 })).toThrow(
       'maxWarmupBatchIterationCount must be a non-negative integer'
     );
   });
 
   test('throws if maxBatchMemorySampleCount is not a non-negative integer', () => {
-    expect(() => toValidatedTestOptions({ maxBatchMemorySampleCount: -1 })).toThrow(
+    expect(() => resolveTestOptions({ maxBatchMemorySampleCount: -1 })).toThrow(
       'maxBatchMemorySampleCount must be a non-negative integer'
     );
   });
@@ -153,15 +153,20 @@ describe('collectBlocks', () => {
   });
 });
 
-describe('appendNode', () => {
+describe('appendChild', () => {
   test('throws if inline test options are invalid', () => {
     expect(() =>
-      appendNode(createTestSuite({}), { kind: 'test', name: 'aaa', testOptions: { measureTimeout: 0 }, callback: noop })
+      appendChild(createTestSuiteNode({}), {
+        kind: 'test',
+        name: 'aaa',
+        testOptions: { measureTimeout: 0 },
+        callback: noop,
+      })
     ).toThrow('measureTimeout must be a positive integer');
   });
 
   test('inherits test options of the parent', () => {
-    const node = appendNode(createTestSuite({ measureTimeout: 111 }), {
+    const node = appendChild(createTestSuiteNode({ measureTimeout: 111 }), {
       kind: 'test',
       name: 'aaa',
       testOptions: { targetRme: 0.5 },
@@ -172,7 +177,7 @@ describe('appendNode', () => {
   });
 
   test('inherits test options that are undefined', () => {
-    const node = appendNode(createTestSuite({ measureTimeout: 111 }), {
+    const node = appendChild(createTestSuiteNode({ measureTimeout: 111 }), {
       kind: 'test',
       name: 'aaa',
       testOptions: { measureTimeout: undefined },
@@ -183,7 +188,7 @@ describe('appendNode', () => {
   });
 
   test('overrides test options of the parent', () => {
-    const node = appendNode(createTestSuite({ measureTimeout: 111 }), {
+    const node = appendChild(createTestSuiteNode({ measureTimeout: 111 }), {
       kind: 'test',
       name: 'aaa',
       testOptions: { measureTimeout: 222 },
@@ -205,7 +210,7 @@ describe('runTest', () => {
       toofast.test('ccc', cccMock);
     });
 
-    await runTest({ testSuite, testPath: [0, 1], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0, 1], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(bbbMock).not.toHaveBeenCalled();
     expect(cccMock).toHaveBeenCalledTimes(1);
@@ -220,7 +225,7 @@ describe('runTest', () => {
       toofast.test('ccc', noop);
     });
 
-    await runTest({ testSuite, testPath: [1, 0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [1, 0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(describeMock).not.toHaveBeenCalled();
   });
@@ -234,7 +239,7 @@ describe('runTest', () => {
       toofast.test('bbb', testMock);
     });
 
-    await runTest({ testSuite, testPath: [0, 0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0, 0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(testMock).toHaveBeenCalledTimes(1);
   });
@@ -248,7 +253,7 @@ describe('runTest', () => {
       toofast.measure(fastOptions, measureMock);
     });
 
-    await runTest({ testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(measureMock).toHaveBeenCalled();
   });
@@ -267,7 +272,7 @@ describe('runTest', () => {
       isHookDoneBeforeTest = isHookDone;
     });
 
-    await runTest({ testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(isHookDoneBeforeTest).toBe(true);
   });
@@ -281,7 +286,7 @@ describe('runTest', () => {
     toofast.beforeEach(beforeEachMock);
     toofast.afterEach(afterEachMock);
 
-    await runTest({ testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(beforeEachMock).toHaveBeenCalledTimes(1);
     expect(afterEachMock).toHaveBeenCalledTimes(1);
@@ -295,7 +300,7 @@ describe('runTest', () => {
       throw new Error('expected');
     });
 
-    await runTest({ testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: sendMessageMock });
+    await runTest({ rootNode: testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: sendMessageMock });
 
     expect(sendMessageMock).toHaveBeenCalledWith({
       type: 'error_caught',
@@ -312,7 +317,7 @@ describe('runTest', () => {
     });
     toofast.afterEach(afterEachMock);
 
-    await runTest({ testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(afterEachMock).toHaveBeenCalledTimes(1);
   });
@@ -344,7 +349,7 @@ describe('runTest', () => {
       toofast.test('hhh', noop);
     });
 
-    await runTest({ testSuite, testPath: [0, 0], getMemoryUsed: () => 0, sendMessage: noop });
+    await runTest({ rootNode: testSuite, testPath: [0, 0], getMemoryUsed: () => 0, sendMessage: noop });
 
     expect(hookNames).toEqual(['aaa', 'bbb', 'fff', 'ggg', 'ddd', 'ccc']);
   });
@@ -365,7 +370,7 @@ describe('runTest', () => {
     });
 
     const result = await runTest({
-      testSuite,
+      rootNode: testSuite,
       testPath: [0],
       // The heap probe allocates memory itself
       getMemoryUsed: () => (heapSize += 111),
@@ -923,7 +928,7 @@ function busyWait(ms: number): void {
 }
 
 /**
- * Creates a measure in a test. The test becomes the node to which hooks are declared.
+ * Creates a measure in a test. The test becomes the node to which hooks are added.
  */
 function makeTestMeasure(options: MeasureOptions, callback: () => unknown): Node {
   const testNode = makeTestNode();
