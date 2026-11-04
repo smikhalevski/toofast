@@ -238,6 +238,65 @@ export async function collectBlocks(node: Node, path: number[] = []): Promise<Bl
   return blocks;
 }
 
+/**
+ * Removes tests whose names don't match any of the patterns, and describe blocks that have no tests left. Describe
+ * blocks that have thrown an error are kept, so the error is reported.
+ *
+ * @param blocks Blocks that are pruned in place.
+ * @param testNamePatterns Patterns of test names prefixed with names of enclosing describe blocks. If empty, all tests
+ * are kept.
+ * @param separator Separates names of enclosing describe blocks and the test name.
+ * @param parentName The name of the parent describe block followed by the separator.
+ */
+export function pruneBlocks(blocks: Block[], testNamePatterns: RegExp[], separator: string, parentName = ''): void {
+  for (let i = blocks.length - 1; i >= 0; --i) {
+    const block = blocks[i];
+    const name = parentName + block.name;
+
+    if (block.kind === 'test') {
+      if (testNamePatterns.length !== 0 && !testNamePatterns.some(pattern => pattern.test(name))) {
+        blocks.splice(i, 1);
+      }
+      continue;
+    }
+
+    pruneBlocks(block.children, testNamePatterns, separator, name + separator);
+
+    if (block.children.length === 0 && block.errorMessage === null) {
+      blocks.splice(i, 1);
+    }
+  }
+}
+
+/**
+ * Returns the number of tests in blocks, including tests in nested describe blocks.
+ */
+export function getTestCount(blocks: Block[]): number {
+  let testCount = 0;
+
+  for (const block of blocks) {
+    testCount += block.kind === 'test' ? 1 : getTestCount(block.children);
+  }
+
+  return testCount;
+}
+
+/**
+ * Returns the length of the longest test name in blocks. Tests in nested describe blocks aren't counted, since only
+ * results of sibling tests are aligned.
+ */
+export function getMaxTestNameLength(blocks: Block[]): number {
+  let maxLength = 0;
+
+  for (const block of blocks) {
+    if (block.kind === 'test') {
+      maxLength = Math.max(maxLength, block.name.length);
+    }
+  }
+
+  return maxLength;
+}
+
 export interface RunTestParams {
   testSuite: Node;
 

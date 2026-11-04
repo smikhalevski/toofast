@@ -2,7 +2,14 @@ import { fork } from 'child_process';
 import path from 'path';
 import { emptyHistogramSummary } from '../Histogram.ts';
 import type { TestOptions } from '../index.ts';
-import type { Block, WorkerEvent, WorkerJob } from '../runner.ts';
+import {
+  type Block,
+  getMaxTestNameLength,
+  getTestCount,
+  pruneBlocks,
+  type WorkerEvent,
+  type WorkerJob,
+} from '../runner.ts';
 import { getErrorMessage } from '../utils.ts';
 import type { Reporter } from './createStreamReporter.ts';
 import type { Config } from './resolveConfig.ts';
@@ -78,7 +85,7 @@ export async function runTestFiles(params: RunTestFilesParams): Promise<void> {
       continue;
     }
 
-    pruneBlocks(blocks, testNamePatterns);
+    pruneBlocks(blocks, testNamePatterns, '.');
 
     testCount += getTestCount(blocks);
     errorCount += await runBlocks({ blocks, setupFiles, testFile, testOptions, reporter });
@@ -194,58 +201,4 @@ function runJobInWorker(job: WorkerJob, handleEvent: (event: WorkerEvent) => voi
       }
     });
   });
-}
-
-/**
- * Removes tests whose names don't match any of the patterns, and describe blocks that have no tests left. Describe
- * blocks that have thrown an error are kept, so the error is reported.
- *
- * @param blocks Blocks that are pruned in place.
- * @param testNamePatterns Patterns of test names prefixed with names of enclosing describe blocks. If empty, all tests
- * are kept.
- * @param parentName The name of the parent describe block followed by a dot.
- */
-function pruneBlocks(blocks: Block[], testNamePatterns: RegExp[], parentName = ''): void {
-  for (let i = blocks.length - 1; i >= 0; --i) {
-    const block = blocks[i];
-    const name = parentName + block.name;
-
-    if (block.kind === 'describe') {
-      pruneBlocks(block.children, testNamePatterns, name + '.');
-    }
-
-    if (shouldPruneBlock(block, name, testNamePatterns)) {
-      blocks.splice(i, 1);
-    }
-  }
-}
-
-function shouldPruneBlock(block: Block, name: string, testNamePatterns: RegExp[]): boolean {
-  if (block.kind === 'describe') {
-    return block.children.length === 0 && block.errorMessage === null;
-  }
-
-  return testNamePatterns.length !== 0 && !testNamePatterns.some(pattern => pattern.test(name));
-}
-
-function getTestCount(blocks: Block[]): number {
-  let testCount = 0;
-
-  for (const block of blocks) {
-    testCount += block.kind === 'test' ? 1 : getTestCount(block.children);
-  }
-
-  return testCount;
-}
-
-function getMaxTestNameLength(blocks: Block[]): number {
-  let maxLength = 0;
-
-  for (const block of blocks) {
-    if (block.kind === 'test') {
-      maxLength = Math.max(maxLength, block.name.length);
-    }
-  }
-
-  return maxLength;
 }

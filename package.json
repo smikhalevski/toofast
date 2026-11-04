@@ -6,7 +6,7 @@
   "types": "./index.d.ts",
   "type": "module",
   "bin": {
-    "toofast": "./nodejs/cli.js"
+    "toofast": "./toofast.js"
   },
   "engines": {
     "node": ">=22.18"
@@ -17,7 +17,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && chmod +x lib/nodejs/cli.js && cp package.json README.md LICENSE.txt src/main/config_schema.json lib/ && cd lib && npm pkg delete scripts devDependencies",
+    "build": "tsc --project tsconfig.build.json && chmod +x lib/toofast.js && cp package.json README.md LICENSE.txt src/main/config_schema.json lib/ && cd lib && npm pkg delete scripts devDependencies",
     "clean": "rimraf lib docs coverage",
     "test": "vitest run",
     "lint": "oxlint --tsconfig tsconfig.json src/main",
