@@ -10,20 +10,38 @@ import type { Config } from './resolveConfig.ts';
 // Sources have the .ts extension, and the build has the .js extension
 const WORKER_FILE = path.join(import.meta.dirname, 'worker' + path.extname(import.meta.filename));
 
-const WORKER_EXEC_ARGV = getWorkerExecArgv();
+const WORKER_EXEC_ARGV = getWorkerExecArgv({
+  execArgv: process.execArgv,
+  isTypeStrippingEnabled: process.features.typescript !== false,
+});
+
+export interface GetWorkerExecArgvParams {
+  /**
+   * Node.js options of the main process.
+   */
+  execArgv: readonly string[];
+
+  /**
+   * `true` if the main process strips types from TypeScript files.
+   */
+  isTypeStrippingEnabled: boolean;
+}
 
 /**
  * Returns Node.js options for worker processes.
  */
-function getWorkerExecArgv(): string[] {
+export function getWorkerExecArgv(params: GetWorkerExecArgvParams): string[] {
+  const { execArgv, isTypeStrippingEnabled } = params;
+
   // The inspector port is already in use by the main process
-  const execArgv = process.execArgv.filter(arg => !arg.startsWith('--inspect'));
+  const workerExecArgv = execArgv.filter(arg => !arg.startsWith('--inspect'));
 
   // Versions before 22.18 strip types only if the option is enabled
-  if (!process.features.typescript) {
-    execArgv.push('--experimental-strip-types', '--no-warnings=ExperimentalWarning');
+  if (!isTypeStrippingEnabled) {
+    workerExecArgv.push('--experimental-strip-types', '--no-warnings=ExperimentalWarning');
   }
-  return execArgv;
+
+  return workerExecArgv;
 }
 
 export interface RunTestFilesParams {

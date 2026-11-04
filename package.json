@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json && chmod +x lib/nodejs/cli.js && cp package.json README.md LICENSE.txt src/main/config_schema.json lib/ && cd lib && npm pkg delete scripts devDependencies",
     "clean": "rimraf lib docs coverage",
-    "test": "npm run build && vitest run",
+    "test": "vitest run",
     "lint": "oxlint --tsconfig tsconfig.json src/main",
     "format": "oxfmt 'src/**/*.{ts,js,json,md}'",
     "docs": "typedoc"

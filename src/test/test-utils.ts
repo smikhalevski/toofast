@@ -31,18 +31,18 @@ export function makeTestNode(): Node {
  * @param files The map from a file path relative to the directory to the file contents.
  * @returns The absolute path of the directory.
  */
-export function makeTestDirectory(files: Record<string, string>): string {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'toofast-'));
+export function makeTestDir(files: Record<string, string>): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'toofast-'));
 
   onTestFinished(() => {
-    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
   for (const [file, contents] of Object.entries(files)) {
-    const filePath = path.join(directory, file);
+    const filePath = path.join(dir, file);
 
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, contents);
   }
-  return directory;
+  return dir;
 }
