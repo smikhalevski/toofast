@@ -364,16 +364,16 @@ export function measure(arg0: unknown, arg1?: unknown): void {
  * Validates the arguments of a block declaration, where options are optional and come before the callback.
  */
 function parseBlockArgs(name: unknown, arg0: any, arg1: any): { options: object; callback: () => unknown } {
-  assert(isString(name), 'name must be a string');
+  assert(isString(name), 'Name must be a string');
 
   if (typeof arg0 === 'function') {
-    assert(arg1 === undefined, 'options must precede the callback');
+    assert(arg1 === undefined, 'Options must precede the callback');
 
     return { options: {}, callback: arg0 };
   }
 
-  assert(isObject(arg0), 'options must be an object');
-  assert(typeof arg1 === 'function', 'callback must be a function');
+  assert(isObject(arg0), 'Options must be an object');
+  assert(typeof arg1 === 'function', 'Callback must be a function');
 
   return { options: arg0, callback: arg1 };
 }
@@ -412,7 +412,7 @@ function addHook(node: Node, type: HookType, callback: HookCallback | undefined)
     return;
   }
 
-  assert(typeof callback === 'function', 'hook must be a function');
+  assert(typeof callback === 'function', 'Hook must be a function');
 
   node.hooks.push({ type, callback });
 }

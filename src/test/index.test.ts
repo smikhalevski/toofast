@@ -8,21 +8,21 @@ describe('describe', () => {
     makeTestSuite();
 
     // @ts-expect-error the name must be a string
-    expect(() => toofast.describe(111, noop)).toThrow('name must be a string');
+    expect(() => toofast.describe(111, noop)).toThrow('Name must be a string');
   });
 
   test('throws if options are not an object', () => {
     makeTestSuite();
 
     // @ts-expect-error options must be an object
-    expect(() => toofast.describe('aaa', 111, noop)).toThrow('options must be an object');
+    expect(() => toofast.describe('aaa', 111, noop)).toThrow('Options must be an object');
   });
 
   test('throws if the callback is missing', () => {
     makeTestSuite();
 
     // @ts-expect-error the callback is missing
-    expect(() => toofast.describe('aaa', { measureTimeout: 111 })).toThrow('callback must be a function');
+    expect(() => toofast.describe('aaa', { measureTimeout: 111 })).toThrow('Callback must be a function');
   });
 
   test('throws if called inside a test', () => {
@@ -51,14 +51,14 @@ describe('measure', () => {
     makeTestNode();
 
     // @ts-expect-error options must precede the callback
-    expect(() => toofast.measure(noop, { measureTimeout: 111 })).toThrow('options must precede the callback');
+    expect(() => toofast.measure(noop, { measureTimeout: 111 })).toThrow('Options must precede the callback');
   });
 
   test('throws if a hook is not a function', () => {
     makeTestNode();
 
     // @ts-expect-error hooks must be functions
-    expect(() => toofast.measure({ beforeBatch: 111 }, noop)).toThrow('hook must be a function');
+    expect(() => toofast.measure({ beforeBatch: 111 }, noop)).toThrow('Hook must be a function');
   });
 });
 

@@ -4,7 +4,7 @@ import { emptyHistogramSummary } from '../Histogram.ts';
 import type { TestOptions } from '../index.ts';
 import type { Block, WorkerEvent, WorkerJob } from '../runner.ts';
 import { getErrorMessage } from '../utils.ts';
-import type { Reporter } from './createReporter.ts';
+import type { Reporter } from './createStreamReporter.ts';
 import type { Config } from './resolveConfig.ts';
 
 // Sources have the .ts extension, and the build has the .js extension
