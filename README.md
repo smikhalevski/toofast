@@ -11,6 +11,7 @@ The Node.js performance testing tool with unit-test-like API.
 - Measures memory allocation of each test.
 - Supports TypeScript test files as is.
 - Zero dependencies.
+- Check out the [Cookbook](#cookbook)!
 
 ```shell
 npm install toofast --save-dev
@@ -20,7 +21,7 @@ TooFast requires Node.js 22.18+.
 
 🔰&ensp;[**Usage**](#usage)
 
-🚀&ensp;[**Authoring tests**](#authoring-tests)
+🚀&ensp;**Authoring tests**
 
 - [`test`](#test)
 - [`measure`](#measure)
@@ -28,16 +29,20 @@ TooFast requires Node.js 22.18+.
 - [Lifecycle hooks](#lifecycle-hooks)
 - [TypeScript support](#typescript-support)
 
-⚙️&ensp;[**Configuration**](#configuration)
+⚙️&ensp;**Configuration**
 
 - [Config file](#config-file)
 - [Test options](#test-options)
 - [Inline options](#inline-options)
 - [Command line arguments](#command-line-arguments)
 
-🎯&ensp;[**How measurement works**](#how-measurement-works)
+🍪&ensp;**Cookbook**
 
-🍿&ensp;[**Why TooFast?**](#why-toofast)
+- [Module load time](#module-load-time)
+
+⏱️&ensp;[**How measurement works**](#how-measurement-works)
+
+🍿&ensp;[**Comparison with peers**](#comparison-with-peers)
 
 # Usage
 
@@ -445,6 +450,28 @@ npx toofast 'factorial.*'
 </dd>
 </dl>
 
+# Cookbook
+
+## Module load time
+
+A module is evaluated once, and later imports return the same module. To load the module on every call, import it from a
+new URL, for example, with a query string:
+
+```ts
+import { test, measure } from 'toofast';
+
+test('load module', () => {
+  let importCount = 0;
+
+  measure(() => import('./module.js?' + importCount++));
+});
+```
+
+Each call loads a new copy of the module, and copies stay in memory until the test ends.
+
+Modules that `module.js` imports are loaded once, so the result shows how long the module itself takes to load and
+evaluate.
+
 # How measurement works
 
 A measure first warms up the callback: it calls the callback one call at a time, so V8 can optimize it.
@@ -469,7 +496,7 @@ Then the measure runs batches with a [pause](#config-batchpauseduration) after e
 The measure stops when the margin of error of batches reaches [`targetRme`](#config-targetrme), but not before
 [`minBatchCount`](#config-minbatchcount) batches, or when [`measureTimeout`](#config-measuretimeout) is reached.
 
-# Why TooFast?
+# Comparison with peers
 
 Most JavaScript benchmarking tools are libraries that run all benchmarks in one process for a fixed amount of time.
 TooFast works like a test runner instead:

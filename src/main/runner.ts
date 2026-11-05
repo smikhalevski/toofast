@@ -437,7 +437,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
   for (const index of testPath) {
     node = node.children[index];
 
-    assert(node !== undefined, 'Test order must not change between invokations');
+    assert(node !== undefined, 'Tests must be declared in the same order every time the test file is imported');
 
     if (node.kind === 'describe') {
       setCurrentNode(node);
@@ -445,7 +445,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
     }
   }
 
-  assert(node.kind === 'test', 'Test order must not change between invokations');
+  assert(node.kind === 'test', 'Tests must be declared in the same order every time the test file is imported');
 
   try {
     await runHooks(getBeforeHookCallbacks(node, 'before_each'));
