@@ -306,7 +306,8 @@ export function test(name: string, arg1: unknown, arg2?: unknown): void {
  * Measures run one by one after the test callback has returned, so hooks that the test registers after the measure
  * apply to it too.
  *
- * @param callback The code to measure. Must be synchronous: if it returns a promise, the measure fails.
+ * @param callback The code to measure. Can be async: if the first call returns a promise, each call starts after the
+ * promise of the previous call has settled. Otherwise, the callback must not return a promise.
  * @example
  * test('factorial of 42', () => {
  *   measure(() => factorial(42));
@@ -319,7 +320,8 @@ export function measure(callback: () => unknown): void;
  * {@link test}.
  *
  * @param options Test options and hooks of the measure.
- * @param callback The code to measure. Must be synchronous: if it returns a promise, the measure fails.
+ * @param callback The code to measure. Can be async: if the first call returns a promise, each call starts after the
+ * promise of the previous call has settled. Otherwise, the callback must not return a promise.
  * @example
  * test('sort', () => {
  *   let values: number[] = [];

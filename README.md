@@ -11,6 +11,7 @@ The Node.js performance testing tool with unit-test-like API.
 - Measures memory allocation of each test.
 - Supports TypeScript test files as is.
 - Zero dependencies.
+- Check out the [Cookbook](#cookbook)!
 
 ```shell
 npm install toofast --save-dev
@@ -20,7 +21,7 @@ TooFast requires Node.js 22.18+.
 
 🔰&ensp;[**Usage**](#usage)
 
-🚀&ensp;[**Authoring tests**](#authoring-tests)
+🚀&ensp;**Authoring tests**
 
 - [`test`](#test)
 - [`measure`](#measure)
@@ -28,16 +29,20 @@ TooFast requires Node.js 22.18+.
 - [Lifecycle hooks](#lifecycle-hooks)
 - [TypeScript support](#typescript-support)
 
-⚙️&ensp;[**Configuration**](#configuration)
+⚙️&ensp;**Configuration**
 
 - [Config file](#config-file)
 - [Test options](#test-options)
 - [Inline options](#inline-options)
 - [Command line arguments](#command-line-arguments)
 
-🎯&ensp;[**How measurement works**](#how-measurement-works)
+🍪&ensp;**Cookbook**
 
-🍿&ensp;[**Why TooFast?**](#why-toofast)
+- [Module load time](#module-load-time)
+
+⏱️&ensp;[**How measurement works**](#how-measurement-works)
+
+🍿&ensp;[**Comparison with peers**](#comparison-with-peers)
 
 # Usage
 
@@ -137,7 +142,22 @@ test('parse a large file', async () => {
 `measure` declares the code to measure, and must be called inside a test. Measures run one by one after the test
 callback returns.
 
-The measured callback must be synchronous: if it returns a promise, the measure fails.
+The measured callback can be async. If its first call returns a promise, each call starts after the promise of the
+previous call has settled, and lasts until its own promise settles:
+
+```ts
+import fs from 'node:fs';
+import { test, measure } from 'toofast';
+
+test('read a large file', () => {
+  measure(async () => {
+    await fs.promises.readFile('./large.json', 'utf8');
+  });
+});
+```
+
+Awaiting a promise takes time too, so an async callback is measured slower than the same code without `async`. If the
+first call doesn't return a promise, the callback is measured as synchronous, and it must not return a promise later.
 
 If a test has several measures, the result of the test is the mean of their call durations and allocations, where each
 measure has the same weight no matter how many batches it has run. The difference between measured callbacks doesn't add
@@ -430,6 +450,28 @@ npx toofast 'factorial.*'
 </dd>
 </dl>
 
+# Cookbook
+
+## Module load time
+
+A module is evaluated once, and later imports return the same module. To load the module on every call, import it from a
+new URL, for example, with a query string:
+
+```ts
+import { test, measure } from 'toofast';
+
+test('load module', () => {
+  let importCount = 0;
+
+  measure(() => import('./module.js?' + importCount++));
+});
+```
+
+Each call loads a new copy of the module, and copies stay in memory until the test ends.
+
+Modules that `module.js` imports are loaded once, so the result shows how long the module itself takes to load and
+evaluate.
+
 # How measurement works
 
 A measure first warms up the callback: it calls the callback one call at a time, so V8 can optimize it.
@@ -438,14 +480,15 @@ Then the measure runs batches with a [pause](#config-batchpauseduration) after e
 
 - A batch calls the callback in loops. A loop is timed as a whole with two
   [`performance.now()`](https://nodejs.org/api/perf_hooks.html#performancenow) calls, so the overhead of the timer is
-  spread over many calls.
+  spread over many calls. If the callback is async, a loop awaits each call, and ends when the promise of its last call
+  settles.
 
 - In the first batch, loops get twice as long until a loop lasts at least [`minLoopDuration`](#config-minloopduration).
   Shorter loops are discarded.
 
-- After a loop, an extra call measures how much the heap has grown during the call, using
-  [`v8.getHeapStatistics()`](https://nodejs.org/api/v8.html#v8getheapstatistics). Samples where the garbage collector
-  has shrunk the heap are discarded.
+- After a loop, an extra call measures how much the heap has grown during the call, or until the promise of an async
+  call settles, using [`v8.getHeapStatistics()`](https://nodejs.org/api/v8.html#v8getheapstatistics). Samples where the
+  garbage collector has shrunk the heap are discarded.
 
 - Each batch adds its mean call duration to the results. The margin of error comes from how much batches differ, so it
   reflects noise such as changes of CPU frequency and garbage collection.
@@ -453,7 +496,7 @@ Then the measure runs batches with a [pause](#config-batchpauseduration) after e
 The measure stops when the margin of error of batches reaches [`targetRme`](#config-targetrme), but not before
 [`minBatchCount`](#config-minbatchcount) batches, or when [`measureTimeout`](#config-measuretimeout) is reached.
 
-# Why TooFast?
+# Comparison with peers
 
 Most JavaScript benchmarking tools are libraries that run all benchmarks in one process for a fixed amount of time.
 TooFast works like a test runner instead:
@@ -485,7 +528,7 @@ How TooFast compares to other tools:
 | Stops when                | Precise enough   | Time is up       | Time is up | Time is up | Time is up           | Precise enough  |
 | `describe` and `test` API | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
 | CLI that finds test files | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
-| Async functions           | ❌               | ✅               | ✅         | ✅         | ✅                   | ✅              |
+| Async functions           | ✅               | ✅               | ✅         | ✅         | ✅                   | ✅              |
 | Memory usage              | ✅               | ❌               | ❌         | ✅         | ❌                   | ❌              |
 | Runtimes                  | Node.js          | Node.js, browser | Multiple   | Multiple   | Node.js              | Node.js         |
 

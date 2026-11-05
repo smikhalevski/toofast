@@ -437,7 +437,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
   for (const index of testPath) {
     node = node.children[index];
 
-    assert(node !== undefined, 'Test order must not change between invokations');
+    assert(node !== undefined, 'Tests must be declared in the same order every time the test file is imported');
 
     if (node.kind === 'describe') {
       setCurrentNode(node);
@@ -445,7 +445,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
     }
   }
 
-  assert(node.kind === 'test', 'Test order must not change between invokations');
+  assert(node.kind === 'test', 'Tests must be declared in the same order every time the test file is imported');
 
   try {
     await runHooks(getBeforeHookCallbacks(node, 'before_each'));
@@ -503,12 +503,16 @@ export interface RunMeasureParams {
 }
 
 /**
- * Warms up the callback of a measure node, and then measures it. Returns `null` if the callback has thrown.
+ * Warms up the callback of a measure node, and then measures it. Returns `null` if the callback has thrown or its
+ * promise was rejected.
  *
  * After warmup, the measure runs batches with a pause after each. A batch calls the callback in loops, and times each
  * loop with two timer reads, so the overhead of the timer is spread over many calls. Each batch adds its mean call
  * duration to the results. The measure stops when batches agree within {@link TestOptions.targetRme}, or when
  * {@link TestOptions.measureTimeout} is reached.
+ *
+ * The callback is async if its first call returns a promise. Then each call starts after the promise of the previous
+ * call has settled, and a loop is timed until the promise of its last call settles.
  */
 export async function runMeasure(params: RunMeasureParams): Promise<MeasureResult | null> {
   const { node, measureIndex, measureCount, getMemoryUsed, sendMessage } = params;
@@ -541,6 +545,33 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   let loopIterationCount = 1;
   let isLoopCalibrated = beforeIterationHooks.length !== 0 || afterIterationHooks.length !== 0;
 
+  // Unknown until the first call shows whether the callback returns a promise
+  let isAsync: boolean | undefined;
+
+  /**
+   * Calls the callback once, and returns how long the call took in milliseconds. A call of an async callback lasts
+   * until its promise settles.
+   */
+  async function measureCallDuration(): Promise<number> {
+    // Lets the caller await this function before the timer is read, see measureAsyncLoopDuration
+    await resolvedPromise;
+
+    const timestamp = performance.now();
+    const result = callback();
+
+    if (isAsync === undefined) {
+      isAsync = isPromiseLike(result);
+    }
+
+    if (isAsync) {
+      await result;
+    } else {
+      assertNotAsync(result);
+    }
+
+    return performance.now() - timestamp;
+  }
+
   /**
    * Calls the callback one iteration at a time until warmup is over. Returns `false` if the callback has thrown.
    */
@@ -556,7 +587,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       for (let i = 0; i < maxIterationCount && performance.now() - batchTimestamp <= batchTimeout; ++i) {
         await runHooks(beforeIterationHooks);
 
-        assertSynchronous(callback());
+        await measureCallDuration();
 
         await runHooks(afterIterationHooks);
       }
@@ -599,7 +630,16 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
 
         await runHooks(beforeIterationHooks);
 
-        const loopDuration = measureLoopDuration(callback, currentLoopIterationCount);
+        let loopDuration;
+
+        if (isAsync === undefined) {
+          // The callback wasn't called yet, so this is the first loop of the measure, which has a single call
+          loopDuration = await measureCallDuration();
+        } else if (isAsync) {
+          loopDuration = await measureAsyncLoopDuration(callback, currentLoopIterationCount);
+        } else {
+          loopDuration = measureLoopDuration(callback, currentLoopIterationCount);
+        }
 
         await runHooks(afterIterationHooks);
 
@@ -641,7 +681,9 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
   async function sampleMemoryUsed(): Promise<void> {
     await runHooks(beforeIterationHooks);
 
-    const memoryUsed = measureMemoryUsed(callback, getMemoryUsed);
+    const memoryUsed = isAsync
+      ? await measureAsyncMemoryUsed(callback, getMemoryUsed)
+      : measureMemoryUsed(callback, getMemoryUsed);
 
     await runHooks(afterIterationHooks);
 
@@ -745,16 +787,34 @@ function measureLoopDuration(callback: () => unknown, iterationCount: number): n
 
   const duration = performance.now() - timestamp;
 
-  assertSynchronous(result);
+  assertNotAsync(result);
 
   return duration;
 }
 
 /**
- * Throws if a measured callback has returned a promise, since only the part of an async callback before its first
- * await would be measured.
+ * Calls an async callback several times in a row, and returns how long all calls took in milliseconds. Each call starts
+ * after the promise of the previous call has settled.
  */
-function assertSynchronous(result: unknown): void {
+async function measureAsyncLoopDuration(callback: () => unknown, iterationCount: number): Promise<number> {
+  // An async function returns its promise when it first suspends, and the caller's await of that promise runs before
+  // the function resumes. The function suspends before the timer is read, so the caller's await isn't timed.
+  await resolvedPromise;
+
+  const timestamp = performance.now();
+
+  for (let i = 0; i < iterationCount; ++i) {
+    await callback();
+  }
+
+  return performance.now() - timestamp;
+}
+
+/**
+ * Throws if a synchronous callback has returned a promise. A synchronous callback isn't awaited, so only the part of
+ * the call before its first await would be measured.
+ */
+function assertNotAsync(result: unknown): void {
   if (!isPromiseLike(result)) {
     return;
   }
@@ -762,7 +822,7 @@ function assertSynchronous(result: unknown): void {
   // The thrown error reports the problem, so a rejection of the promise must not crash the process
   Promise.resolve(result).then(undefined, noop);
 
-  throw new Error('measure() callback must be synchronous');
+  throw new Error('measure() callback must not return a promise if its first call did not');
 }
 
 /**
@@ -774,10 +834,39 @@ function measureMemoryUsed(callback: () => unknown, getMemoryUsed: () => number)
   const probeMemoryUsed = measureHeapGrowth(noop, getMemoryUsed);
   const callbackMemoryUsed = measureHeapGrowth(callback, getMemoryUsed);
 
+  return getCallbackMemoryUsed(probeMemoryUsed, callbackMemoryUsed);
+}
+
+/**
+ * Calls an async callback once, and returns the number of bytes it has allocated until its promise has settled, or
+ * `null` if the garbage collector has distorted the measurement.
+ */
+async function measureAsyncMemoryUsed(callback: () => unknown, getMemoryUsed: () => number): Promise<number | null> {
+  // Lets the caller await this function before the heap is read, see measureAsyncLoopDuration. Otherwise, only the
+  // heap growth around the probe would include the caller's await.
+  await resolvedPromise;
+
+  // Awaiting allocates memory itself, so the heap growth around awaiting a promise that already exists is subtracted.
+  // Awaiting a value that isn't a promise, or a new promise, would allocate a promise, and hide the one that an async
+  // callback allocates.
+  const probeMemoryUsed = await measureAsyncHeapGrowth(getResolvedPromise, getMemoryUsed);
+  const callbackMemoryUsed = await measureAsyncHeapGrowth(callback, getMemoryUsed);
+
+  return getCallbackMemoryUsed(probeMemoryUsed, callbackMemoryUsed);
+}
+
+/**
+ * Returns the number of bytes that a callback has allocated, or `null` if the garbage collector has distorted the
+ * measurement.
+ *
+ * @param probeMemoryUsed How many bytes the heap has grown around a call that allocates nothing.
+ * @param callbackMemoryUsed How many bytes the heap has grown around a call of the callback.
+ */
+function getCallbackMemoryUsed(probeMemoryUsed: number, callbackMemoryUsed: number): number | null {
   const memoryUsed = callbackMemoryUsed - probeMemoryUsed;
 
   // The heap shrinks if the garbage collector runs. The difference is also negative if the probe has allocated more
-  // memory around the noop, which happens the first few times the probe runs.
+  // memory, which happens the first few times the probe runs.
   return probeMemoryUsed < 0 || memoryUsed < 0 ? null : memoryUsed;
 }
 
@@ -792,6 +881,27 @@ function measureHeapGrowth(callback: () => unknown, getMemoryUsed: () => number)
   callback();
 
   return getMemoryUsed() - startMemoryUsed;
+}
+
+/**
+ * Returns how many bytes the heap has grown during a call and until its promise has settled. Both the probe and the
+ * callback must be measured by this function, like in {@link measureHeapGrowth}.
+ */
+async function measureAsyncHeapGrowth(callback: () => unknown, getMemoryUsed: () => number): Promise<number> {
+  const startMemoryUsed = getMemoryUsed();
+
+  await callback();
+
+  return getMemoryUsed() - startMemoryUsed;
+}
+
+const resolvedPromise = Promise.resolve();
+
+/**
+ * Returns the same promise every time, so a call allocates nothing.
+ */
+function getResolvedPromise(): Promise<void> {
+  return resolvedPromise;
 }
 
 /**
