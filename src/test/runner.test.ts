@@ -1,3 +1,4 @@
+import v8 from 'v8';
 import { beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import * as toofast from '../main/index.ts';
 import type { MeasureOptions } from '../main/index.ts';
@@ -7,6 +8,7 @@ import {
   createTestSuiteNode,
   type Node,
   runMeasure,
+  type RunMeasureParams,
   runTest,
   resolveTestOptions,
 } from '../main/runner.ts';
@@ -397,8 +399,15 @@ describe('runMeasure', () => {
     return memoryUsed;
   }
 
-  function measureNode(node: Node) {
-    return runMeasure({ node, measureIndex: 0, measureCount: 1, getMemoryUsed, sendMessage: sendMessageMock });
+  function measureNode(node: Node, overrides: Partial<RunMeasureParams> = {}) {
+    return runMeasure({
+      node,
+      measureIndex: 0,
+      measureCount: 1,
+      getMemoryUsed,
+      sendMessage: sendMessageMock,
+      ...overrides,
+    });
   }
 
   function getProgressPercentages(): number[] {
@@ -422,19 +431,18 @@ describe('runMeasure', () => {
     expect(sendMessageMock.mock.calls.map(([message]) => message.type)).toEqual(['progress_updated', 'error_caught']);
   });
 
-  test('reports an error if the callback returns a promise', async () => {
-    // The rejection would fail the test run if it wasn't handled
+  test('reports an error if the promise of an async callback is rejected', async () => {
     const node = makeTestMeasure(fastOptions, () => Promise.reject(new Error('expected')));
 
     await expect(measureNode(node)).resolves.toBeNull();
 
     expect(sendMessageMock).toHaveBeenCalledWith({
       type: 'error_caught',
-      errorMessage: expect.stringContaining('measure() callback must be synchronous'),
+      errorMessage: expect.stringContaining('Error: expected'),
     });
   });
 
-  test('reports an error if the callback returns a promise during warmup', async () => {
+  test('reports an error if the promise of an async callback is rejected during warmup', async () => {
     const node = makeTestMeasure({ ...fastOptions, maxWarmupBatchIterationCount: 1 }, () =>
       Promise.reject(new Error('expected'))
     );
@@ -444,8 +452,30 @@ describe('runMeasure', () => {
     // The measure fails before batches start
     expect(sendMessageMock.mock.calls.map(([message]) => message)).toEqual([
       { type: 'warmup_started', measureIndex: 0, measureCount: 1 },
-      { type: 'error_caught', errorMessage: expect.stringContaining('measure() callback must be synchronous') },
+      { type: 'error_caught', errorMessage: expect.stringContaining('Error: expected') },
     ]);
+  });
+
+  test('reports an error if the callback returns a promise after its first call did not', async () => {
+    let isFirstCall = true;
+
+    // Warmup checks the result of every call, and isn't limited by time
+    const node = makeTestMeasure({ ...fastOptions, maxWarmupBatchIterationCount: 2, batchTimeout: 1_000 }, () => {
+      if (isFirstCall) {
+        isFirstCall = false;
+        return;
+      }
+
+      // The rejection would fail the test run if it wasn't handled
+      return Promise.reject(new Error('expected'));
+    });
+
+    await expect(measureNode(node)).resolves.toBeNull();
+
+    expect(sendMessageMock).toHaveBeenCalledWith({
+      type: 'error_caught',
+      errorMessage: expect.stringContaining('measure() callback must not return a promise if its first call did not'),
+    });
   });
 
   test('reports an error if a hook is registered while the measure runs', async () => {
@@ -734,6 +764,59 @@ describe('runMeasure', () => {
     expect(result!.durationHistogram.mean).toBeGreaterThan(0);
   });
 
+  test('times loops of an async callback until the promise of the last call settles', async () => {
+    // The timer advances only when the callback is called, so a call lasts exactly 1 ms
+    vi.useFakeTimers({ toFake: ['performance'] });
+
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    // Loops last at least 5 ms, so they have several calls
+    const node = makeTestMeasure({ ...fastOptions, minLoopDuration: 5 }, async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(1);
+    });
+
+    const result = await measureNode(node);
+
+    expect(result!.durationHistogram.mean).toBe(1);
+  });
+
+  test('times the first call of an async callback', async () => {
+    vi.useFakeTimers({ toFake: ['performance'] });
+
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    // Without warmup, the first call of the measure is the only call of the first batch
+    const node = makeTestMeasure({ ...fastOptions, maxBatchIterationCount: 1 }, async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(1);
+    });
+
+    const result = await measureNode(node);
+
+    expect(result!.durationHistogram.mean).toBe(1);
+  });
+
+  test('calls an async callback after the promise of the previous call has settled', async () => {
+    let isCallPending = false;
+
+    const node = makeTestMeasure(fastOptions, async () => {
+      if (isCallPending) {
+        throw new Error('unexpected');
+      }
+
+      isCallPending = true;
+      await Promise.resolve();
+      isCallPending = false;
+    });
+
+    await expect(measureNode(node)).resolves.not.toBeNull();
+  });
+
   test('ends a batch when the measure times out', async () => {
     const node = makeTestMeasure({ ...fastOptions, measureTimeout: 50, batchTimeout: 2_000 }, noop);
 
@@ -861,6 +944,39 @@ describe('runMeasure', () => {
     const result = await measureNode(node);
 
     expect(result!.memoryHistogram.mean).toBe(222);
+  });
+
+  test('counts memory that an async callback allocates until its promise settles', async () => {
+    const node = makeTestMeasure(fastOptions, async () => {
+      await Promise.resolve();
+      memoryUsed += 222;
+    });
+
+    const result = await measureNode(node);
+
+    expect(result!.memoryHistogram.mean).toBe(222);
+  });
+
+  test('does not count memory allocated by awaiting an async callback', async () => {
+    // The promise escapes, so the optimizing compiler can't remove its allocation
+    const sink = { promise: Promise.resolve() };
+
+    // Both callbacks allocate a promise, but only the promise of the async callback is awaited
+    const syncNode = makeTestMeasure(fastOptions, () => {
+      sink.promise = Promise.resolve();
+    });
+    const asyncNode = makeTestMeasure(fastOptions, () => Promise.resolve());
+
+    function getUsedHeapSize(): number {
+      return v8.getHeapStatistics().used_heap_size;
+    }
+
+    const syncResult = await measureNode(syncNode, { getMemoryUsed: getUsedHeapSize });
+    const asyncResult = await measureNode(asyncNode, { getMemoryUsed: getUsedHeapSize });
+
+    // V8 can allocate memory for itself while a call is measured, for example, for compiled code, so means differ by a
+    // few bytes
+    expect(asyncResult!.memoryHistogram.mean).toBeCloseTo(syncResult!.memoryHistogram.mean, -1);
   });
 
   test('discards distorted memory samples', async () => {

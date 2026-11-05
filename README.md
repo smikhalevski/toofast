@@ -137,7 +137,22 @@ test('parse a large file', async () => {
 `measure` declares the code to measure, and must be called inside a test. Measures run one by one after the test
 callback returns.
 
-The measured callback must be synchronous: if it returns a promise, the measure fails.
+The measured callback can be async. If its first call returns a promise, each call starts after the promise of the
+previous call has settled, and lasts until its own promise settles:
+
+```ts
+import fs from 'node:fs';
+import { test, measure } from 'toofast';
+
+test('read a large file', () => {
+  measure(async () => {
+    await fs.promises.readFile('./large.json', 'utf8');
+  });
+});
+```
+
+Awaiting a promise takes time too, so an async callback is measured slower than the same code without `async`. If the
+first call doesn't return a promise, the callback is measured as synchronous, and it must not return a promise later.
 
 If a test has several measures, the result of the test is the mean of their call durations and allocations, where each
 measure has the same weight no matter how many batches it has run. The difference between measured callbacks doesn't add
@@ -438,14 +453,15 @@ Then the measure runs batches with a [pause](#config-batchpauseduration) after e
 
 - A batch calls the callback in loops. A loop is timed as a whole with two
   [`performance.now()`](https://nodejs.org/api/perf_hooks.html#performancenow) calls, so the overhead of the timer is
-  spread over many calls.
+  spread over many calls. If the callback is async, a loop awaits each call, and ends when the promise of its last call
+  settles.
 
 - In the first batch, loops get twice as long until a loop lasts at least [`minLoopDuration`](#config-minloopduration).
   Shorter loops are discarded.
 
-- After a loop, an extra call measures how much the heap has grown during the call, using
-  [`v8.getHeapStatistics()`](https://nodejs.org/api/v8.html#v8getheapstatistics). Samples where the garbage collector
-  has shrunk the heap are discarded.
+- After a loop, an extra call measures how much the heap has grown during the call, or until the promise of an async
+  call settles, using [`v8.getHeapStatistics()`](https://nodejs.org/api/v8.html#v8getheapstatistics). Samples where the
+  garbage collector has shrunk the heap are discarded.
 
 - Each batch adds its mean call duration to the results. The margin of error comes from how much batches differ, so it
   reflects noise such as changes of CPU frequency and garbage collection.
@@ -485,7 +501,7 @@ How TooFast compares to other tools:
 | Stops when                | Precise enough   | Time is up       | Time is up | Time is up | Time is up           | Precise enough  |
 | `describe` and `test` API | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
 | CLI that finds test files | ✅               | ✅               | ❌         | ❌         | ❌                   | ❌              |
-| Async functions           | ❌               | ✅               | ✅         | ✅         | ✅                   | ✅              |
+| Async functions           | ✅               | ✅               | ✅         | ✅         | ✅                   | ✅              |
 | Memory usage              | ✅               | ❌               | ❌         | ✅         | ❌                   | ❌              |
 | Runtimes                  | Node.js          | Node.js, browser | Multiple   | Multiple   | Node.js              | Node.js         |
 
