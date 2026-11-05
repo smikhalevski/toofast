@@ -13,15 +13,15 @@ The Node.js performance testing tool with unit-test-like API.
 - Zero dependencies.
 - Check out the [Cookbook](#cookbook)!
 
+<br>
+
 ```shell
 npm install toofast --save-dev
 ```
 
-TooFast requires Node.js 22.18+.
+<br>
 
-🔰&ensp;[**Usage**](#usage)
-
-🚀&ensp;**Authoring tests**
+🔰&ensp;[**Quick start**](#quick-start)
 
 - [`test`](#test)
 - [`measure`](#measure)
@@ -44,7 +44,7 @@ TooFast requires Node.js 22.18+.
 
 🍿&ensp;[**Comparison with peers**](#comparison-with-peers)
 
-# Usage
+# Quick start
 
 Let's write a performance test for a function that computes a factorial.
 
@@ -100,10 +100,6 @@ unknown, for example, if a measure has run a single batch.
 
 The process exits with code 1 if a test, a `describe` block, a hook or a test file throws, if a test process crashes, or
 if no tests are found.
-
-# Authoring tests
-
-TooFast exports functions that declare tests and hooks in a test file.
 
 ## `test`
 
