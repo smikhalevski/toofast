@@ -566,7 +566,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
     if (isAsync) {
       await result;
     } else {
-      assertSynchronous(result);
+      assertNotAsync(result);
     }
 
     return performance.now() - timestamp;
@@ -787,7 +787,7 @@ function measureLoopDuration(callback: () => unknown, iterationCount: number): n
 
   const duration = performance.now() - timestamp;
 
-  assertSynchronous(result);
+  assertNotAsync(result);
 
   return duration;
 }
@@ -814,7 +814,7 @@ async function measureAsyncLoopDuration(callback: () => unknown, iterationCount:
  * Throws if a synchronous callback has returned a promise. A synchronous callback isn't awaited, so only the part of
  * the call before its first await would be measured.
  */
-function assertSynchronous(result: unknown): void {
+function assertNotAsync(result: unknown): void {
   if (!isPromiseLike(result)) {
     return;
   }
