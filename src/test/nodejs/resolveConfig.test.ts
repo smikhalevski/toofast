@@ -139,6 +139,14 @@ describe('resolveConfig', () => {
     expect(() => resolveConfig([], dir)).toThrow('durationUnit must be "hertz" or "second"');
   });
 
+  test('throws if a config file has a percentile out of range', () => {
+    const dir = makeTestDir({
+      'toofast.json': JSON.stringify({ percentiles: [50, 111] }),
+    });
+
+    expect(() => resolveConfig([], dir)).toThrow('percentiles must be an array of numbers between 0 and 100');
+  });
+
   test('throws if an argument is unknown', () => {
     const dir = makeTestDir({});
 

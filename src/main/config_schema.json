@@ -91,6 +91,16 @@
       "type": "string",
       "enum": ["hertz", "second"],
       "default": "hertz"
+    },
+    "percentiles": {
+      "description": "Percentiles of call durations to show in results, between 0 and 100. Each percentile is shown in a separate column in durationUnit.",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "default": []
     }
   }
 }

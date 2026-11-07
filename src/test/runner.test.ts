@@ -849,6 +849,25 @@ describe('runMeasure', () => {
     expect(result!.durationHistogram.size).toBe(batchCount);
   });
 
+  test('adds the mean call duration of each timed loop to the reservoir', async () => {
+    // The timer advances only when the callback is called, so a call lasts exactly 1 ms
+    vi.useFakeTimers({ toFake: ['performance'] });
+
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    // Loops last at least 5 ms, so they have several calls, and a batch has several loops
+    const node = makeTestMeasure({ ...fastOptions, batchTimeout: 20, minLoopDuration: 5 }, () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    const result = await measureNode(node);
+
+    expect(result!.durationReservoir.count).toBeGreaterThan(result!.durationHistogram.size);
+    expect(result!.durationReservoir.getPercentile(100)).toBe(1);
+  });
+
   test('runs at least minBatchCount batches', async () => {
     let batchCount = 0;
 

@@ -154,6 +154,20 @@ describe('runTestFiles', () => {
     expect(runToofast(dir).stdout).toMatch(/^Test +│ Duration +│ Memory$/m);
   });
 
+  test('prints percentiles from the config file', () => {
+    const dir = makeTestDir({
+      'aaa.perf.ts':
+        importToofast +
+        "test('bbb', { measureTimeout: 1, maxWarmupBatchIterationCount: 0 }, () => { measure(() => {}); });",
+      'toofast.json': JSON.stringify({ percentiles: [50, 99] }),
+    });
+
+    const lines = runToofast(dir).stdout.split('\n');
+
+    expect(lines[0]).toMatch(/^Test +│ Speed +│ p50 +│ p99 +│ Memory$/);
+    expect(lines[1]).toMatch(/│ +[\d.]+ [kMG]?Hz +│ +[\d.]+ [kMG]?Hz +│/);
+  });
+
   test('exits with 1 if no tests are found', () => {
     const dir = makeTestDir({
       'aaa.perf.ts': importToofast + "test('bbb', () => {});",

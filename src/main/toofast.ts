@@ -11,7 +11,10 @@ try {
 
   await runTestFiles({
     config,
-    reporter: createStreamReporter({ durationUnit: config.durationUnit }),
+    reporter: createStreamReporter({
+      durationUnit: config.durationUnit,
+      percentiles: config.percentiles,
+    }),
   });
 } catch (error) {
   process.stderr.write(styleText('red', getErrorMessage(error), { stream: process.stderr }) + '\n');

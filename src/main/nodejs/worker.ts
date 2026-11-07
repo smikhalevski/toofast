@@ -37,9 +37,10 @@ async function runJob(job: WorkerJob): Promise<WorkerEvent> {
     };
   }
 
-  const { durationSummary, memorySummary } = await runTest({
+  const { durationSummary, memorySummary, durationPercentiles } = await runTest({
     rootNode: testSuiteNode,
     testPath: job.testPath,
+    percentiles: job.percentiles,
     getMemoryUsed,
     sendMessage,
   });
@@ -48,6 +49,7 @@ async function runJob(job: WorkerJob): Promise<WorkerEvent> {
     type: 'test_ended',
     durationSummary,
     memorySummary,
+    durationPercentiles,
   };
 }
 

@@ -39,16 +39,24 @@ export interface StreamReporterOptions {
    * @default 'hertz'
    */
   durationUnit?: DurationUnit;
+
+  /**
+   * Percentiles of call durations to show in results, between `0` and `100`.
+   *
+   * @default []
+   */
+  percentiles?: readonly number[];
 }
 
 /**
  * Creates a reporter that prints test results.
  */
 export function createStreamReporter(options: StreamReporterOptions = {}): Reporter {
-  const { stream = process.stdout, durationUnit } = options;
+  const { stream = process.stdout, durationUnit, percentiles } = options;
 
   const formatter = createFormatter({
     durationUnit,
+    percentiles,
     applyStyle: (textRole, text) => styleText(textRoleColors[textRole], text, { stream }),
   });
 
@@ -163,7 +171,7 @@ export function createStreamReporter(options: StreamReporterOptions = {}): Repor
     },
 
     onTestEnd(params) {
-      const { block, durationSummary, memorySummary, errorMessages } = params;
+      const { block, durationSummary, memorySummary, durationPercentiles, errorMessages } = params;
 
       clearLine();
 
@@ -175,6 +183,7 @@ export function createStreamReporter(options: StreamReporterOptions = {}): Repor
           isFailed: errorMessages.length !== 0,
           durationSummary,
           memorySummary,
+          durationPercentiles,
         }) + '\n'
       );
 

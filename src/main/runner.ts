@@ -1,5 +1,6 @@
 import { Histogram, type HistogramSummary, summarizeHistograms } from './Histogram.ts';
 import type { HookCallback, TestOptions } from './index.ts';
+import { Reservoir, summarizeReservoirs } from './Reservoir.ts';
 import {
   assert,
   getErrorStackOrMessage,
@@ -96,7 +97,14 @@ export interface TestModule {
  */
 export type WorkerJob =
   | { type: 'collect_blocks'; setupFiles: string[]; testFile: string; testOptions: TestOptions }
-  | { type: 'run_test'; setupFiles: string[]; testFile: string; testOptions: TestOptions; testPath: number[] };
+  | {
+      type: 'run_test';
+      setupFiles: string[];
+      testFile: string;
+      testOptions: TestOptions;
+      testPath: number[];
+      percentiles: number[];
+    };
 
 /**
  * An event of a job that runs in a worker. The last event of a job is `blocks_collected`, `test_ended` or `job_failed`.
@@ -106,17 +114,33 @@ export type WorkerEvent =
   | { type: 'warmup_started'; measureIndex: number; measureCount: number }
   | { type: 'progress_updated'; measureIndex: number; measureCount: number; percentage: number }
   | { type: 'error_caught'; errorMessage: string }
-  | { type: 'test_ended'; durationSummary: HistogramSummary; memorySummary: HistogramSummary }
+  | {
+      type: 'test_ended';
+      durationSummary: HistogramSummary;
+      memorySummary: HistogramSummary;
+      durationPercentiles: number[];
+    }
   | { type: 'job_failed'; errorMessage: string };
 
 export interface MeasureResult {
   durationHistogram: Histogram;
   memoryHistogram: Histogram;
+
+  /**
+   * Mean call durations of timed loops.
+   */
+  durationReservoir: Reservoir;
 }
 
 export interface TestResult {
   durationSummary: HistogramSummary;
   memorySummary: HistogramSummary;
+
+  /**
+   * Requested percentiles of mean call durations of timed loops in milliseconds, in the order they were requested. A
+   * percentile is `NaN` if nothing was measured.
+   */
+  durationPercentiles: number[];
 }
 
 export interface WarmupStartParams {
@@ -206,6 +230,12 @@ export interface Reporter {
    */
   onError(errorMessage: string): void;
 }
+
+/**
+ * The maximum number of timed loops whose mean call durations a measure keeps for percentiles. If a measure times more
+ * loops, percentiles are estimated from a random sample of them.
+ */
+const DURATION_RESERVOIR_CAPACITY = 10_000;
 
 const defaultTestOptions: Required<TestOptions> = {
   measureTimeout: 10_000,
@@ -417,6 +447,13 @@ export interface RunTestParams {
    */
   testPath: number[];
 
+  /**
+   * Percentiles of call durations to compute, between `0` and `100`.
+   *
+   * @default []
+   */
+  percentiles?: readonly number[];
+
   getMemoryUsed(): number;
 
   sendMessage(message: WorkerEvent): void;
@@ -427,10 +464,11 @@ export interface RunTestParams {
  * objects to the measured heap.
  */
 export async function runTest(params: RunTestParams): Promise<TestResult> {
-  const { rootNode, testPath, getMemoryUsed, sendMessage } = params;
+  const { rootNode, testPath, percentiles = [], getMemoryUsed, sendMessage } = params;
 
   const durationHistograms: Histogram[] = [];
   const memoryHistograms: Histogram[] = [];
+  const durationReservoirs: Reservoir[] = [];
 
   let node = rootNode;
 
@@ -467,6 +505,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
       if (result !== null) {
         durationHistograms.push(result.durationHistogram);
         memoryHistograms.push(result.memoryHistogram);
+        durationReservoirs.push(result.durationReservoir);
       }
     }
   } catch (error) {
@@ -489,6 +528,7 @@ export async function runTest(params: RunTestParams): Promise<TestResult> {
   return {
     durationSummary: summarizeHistograms(durationHistograms),
     memorySummary: summarizeHistograms(memoryHistograms),
+    durationPercentiles: summarizeReservoirs(durationReservoirs, percentiles),
   };
 }
 
@@ -508,8 +548,9 @@ export interface RunMeasureParams {
  *
  * After warmup, the measure runs batches with a pause after each. A batch calls the callback in loops, and times each
  * loop with two timer reads, so the overhead of the timer is spread over many calls. Each batch adds its mean call
- * duration to the results. The measure stops when batches agree within {@link TestOptions.targetRme}, or when
- * {@link TestOptions.measureTimeout} is reached.
+ * duration to the results, and each timed loop adds its mean call duration to the reservoir for percentiles. The
+ * measure stops when batches agree within {@link TestOptions.targetRme}, or when {@link TestOptions.measureTimeout} is
+ * reached.
  *
  * The callback is async if its first call returns a promise. Then each call starts after the promise of the previous
  * call has settled, and a loop is timed until the promise of its last call settles.
@@ -539,6 +580,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
 
   const durationHistogram = new Histogram();
   const memoryHistogram = new Histogram();
+  const durationReservoir = new Reservoir(DURATION_RESERVOIR_CAPACITY);
 
   // Iteration hooks run around every call, so then a loop has a single iteration. Otherwise, loops of the first batch
   // double until a loop lasts at least minLoopDuration.
@@ -655,6 +697,8 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
         timedIterationCount += currentLoopIterationCount;
         timedDuration += loopDuration;
 
+        durationReservoir.add(loopDuration / currentLoopIterationCount);
+
         if (memorySampleCount < maxBatchMemorySampleCount && iterationCount < maxBatchIterationCount) {
           await sampleMemoryUsed();
 
@@ -752,6 +796,7 @@ export async function runMeasure(params: RunMeasureParams): Promise<MeasureResul
       return {
         durationHistogram,
         memoryHistogram,
+        durationReservoir,
       };
     }
 
