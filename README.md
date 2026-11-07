@@ -90,7 +90,8 @@ TooFast prints results of each test:
 
 <br>
 
-- `4.20 MHz` is how many times per second the function runs: 4.2 million calls per second.
+- `4.20 MHz` is how many times per second the function runs: 4.2 million calls per second. Set
+  [`durationUnit`](#config-durationunit) to show how long a call takes instead.
 - `314.90 B` is how many bytes a call allocates on the heap.
 - `± 2.29%` is the margin of error of the value on its left at 95% confidence.
 
@@ -307,6 +308,15 @@ in a separate process, so setup files are imported in each of them.
 <dd>
 
 The default [test options](#test-options) of all tests.
+
+</dd>
+<dt><a name="config-durationunit"></a><code>durationUnit</code></dt>
+<dd>
+
+The unit of durations in results: `"hertz"` shows how many times per second a function runs (larger is better), and
+`"second"` shows how long a call takes (smaller is better).
+
+Defaults to `"hertz"`.
 
 </dd>
 </dl>

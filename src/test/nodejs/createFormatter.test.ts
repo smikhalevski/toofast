@@ -11,6 +11,8 @@ describe('createFormatter', () => {
     applyStyle: (textRole, text) => '<' + textRole + '>' + text + '</' + textRole + '>',
   });
 
+  const secondsFormatter = createFormatter({ durationUnit: 'second' });
+
   const summaries = {
     durationSummary: { size: 5, mean: 0.25, rme: 0.0229 },
     memorySummary: { size: 10, mean: 222, rme: 0 },
@@ -174,6 +176,26 @@ describe('createFormatter', () => {
         memorySummary: { size: 2, mean: 999.996, rme: 0 },
       })
     ).toBe('✓ aaa │   4.00 kHz ±  0.00% │   1.00 kB ±  0.00%');
+  });
+
+  test('formats durations in seconds', () => {
+    expect(secondsFormatter.formatHeader(5)).toBe('Test  │ Duration           │ Memory');
+    expect(
+      secondsFormatter.formatTestEnd({ depth: 0, testName: 'aaa', testColumnWidth: 5, isFailed: false, ...summaries })
+    ).toBe('✓ aaa │ 250.00 µs ±  2.29% │ 222.00 B  ±  0.00%');
+  });
+
+  test('scales durations in seconds that would round to 1000.00', () => {
+    expect(
+      secondsFormatter.formatTestEnd({
+        depth: 0,
+        testName: 'aaa',
+        testColumnWidth: 5,
+        isFailed: false,
+        durationSummary: { size: 2, mean: 999.9996, rme: 0 },
+        memorySummary: { size: 2, mean: 222, rme: 0 },
+      })
+    ).toBe('✓ aaa │   1.00 s  ±  0.00% │ 222.00 B  ±  0.00%');
   });
 
   test('formats unknown values and margins of error as n/a', () => {

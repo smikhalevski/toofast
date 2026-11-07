@@ -7,9 +7,11 @@ import { runTestFiles } from './nodejs/runTestFiles.ts';
 import { getErrorMessage } from './utils.ts';
 
 try {
+  const config = resolveConfig();
+
   await runTestFiles({
-    config: resolveConfig(),
-    reporter: createStreamReporter(),
+    config,
+    reporter: createStreamReporter({ durationUnit: config.durationUnit }),
   });
 } catch (error) {
   process.stderr.write(styleText('red', getErrorMessage(error), { stream: process.stderr }) + '\n');

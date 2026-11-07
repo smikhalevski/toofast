@@ -145,6 +145,15 @@ describe('runTestFiles', () => {
     ]);
   });
 
+  test('prints durations in the unit from the config file', () => {
+    const dir = makeTestDir({
+      'aaa.perf.ts': importToofast + "test('bbb', () => { throw new Error('expected'); });",
+      'toofast.json': JSON.stringify({ durationUnit: 'second' }),
+    });
+
+    expect(runToofast(dir).stdout).toMatch(/^Test +│ Duration +│ Memory$/m);
+  });
+
   test('exits with 1 if no tests are found', () => {
     const dir = makeTestDir({
       'aaa.perf.ts': importToofast + "test('bbb', () => {});",

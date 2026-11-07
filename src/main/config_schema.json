@@ -85,6 +85,12 @@
           "default": 10
         }
       }
+    },
+    "durationUnit": {
+      "description": "The unit of durations in results: hertz shows how many times per second a function runs (larger is better), and second shows how long a call takes (smaller is better).",
+      "type": "string",
+      "enum": ["hertz", "second"],
+      "default": "hertz"
     }
   }
 }

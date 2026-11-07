@@ -1,7 +1,7 @@
 import rl from 'readline';
 import { type InspectColor, styleText } from 'util';
 import type { Block, Reporter } from '../runner.ts';
-import { createFormatter, type TestColumnLine, type TextRole } from './createFormatter.ts';
+import { createFormatter, type DurationUnit, type TestColumnLine, type TextRole } from './createFormatter.ts';
 
 /**
  * Colors and modifiers of text roles. They're applied only if the stream supports colors.
@@ -24,14 +24,31 @@ const textRoleColors: Record<TextRole, InspectColor | InspectColor[]> = {
   excessive_rme: 'red',
 };
 
+export interface StreamReporterOptions {
+  /**
+   * The stream to print to. Progress is redrawn in place, so it's printed only if the stream is a TTY. Colors are used
+   * if the stream supports them.
+   *
+   * @default process.stdout
+   */
+  stream?: NodeJS.WriteStream;
+
+  /**
+   * The unit of durations in results.
+   *
+   * @default 'hertz'
+   */
+  durationUnit?: DurationUnit;
+}
+
 /**
  * Creates a reporter that prints test results.
- *
- * @param stream The stream to print to. Progress is redrawn in place, so it's printed only if the stream is a TTY.
- * Colors are used if the stream supports them.
  */
-export function createStreamReporter(stream: NodeJS.WriteStream = process.stdout): Reporter {
+export function createStreamReporter(options: StreamReporterOptions = {}): Reporter {
+  const { stream = process.stdout, durationUnit } = options;
+
   const formatter = createFormatter({
+    durationUnit,
     applyStyle: (textRole, text) => styleText(textRoleColors[textRole], text, { stream }),
   });
 

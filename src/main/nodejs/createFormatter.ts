@@ -93,6 +93,12 @@ export interface FormatTestEndParams extends FormatTestStartParams {
 }
 
 /**
+ * The unit of durations in results: `hertz` shows how many times per second a function runs (larger is better), and
+ * `second` shows how long a call takes (smaller is better).
+ */
+export type DurationUnit = 'hertz' | 'second';
+
+/**
  * Formats lines of the report. Lines don't end with a line break, so the reporter decides how lines follow each other.
  */
 export interface Formatter {
@@ -149,6 +155,13 @@ export interface Formatter {
  */
 export interface FormatterOptions {
   /**
+   * The unit of durations in results.
+   *
+   * @default 'hertz'
+   */
+  durationUnit?: DurationUnit;
+
+  /**
    * Styles a piece of text by its role, for example, colors it. By default, text isn't styled.
    */
   applyStyle?: (textRole: TextRole, text: string) => string;
@@ -195,9 +208,9 @@ export interface FormatterOptions {
   testColumnName?: string;
 
   /**
-   * The name of the column that shows durations as iterations per second.
+   * The name of the column that shows durations.
    *
-   * @default 'Speed'
+   * @default 'Speed' if {@link durationUnit} is 'hertz', or 'Duration' otherwise
    */
   durationColumnName?: string;
 
@@ -235,8 +248,13 @@ const rmeFormat = new Intl.NumberFormat('en', {
 const MAX_VALUE = 999.99;
 const MAX_RME = 0.9999;
 
-const DURATION_UNIT = 'Hz';
-const MEMORY_UNIT = 'B';
+/**
+ * Units from the smallest to the largest, each is 1000 times larger than the previous one. Units are padded to the same
+ * width, so margins of error are aligned.
+ */
+const hertzDurationUnits = ['Hz ', 'kHz', 'MHz', 'GHz'];
+const secondDurationUnits = ['ns', 'µs', 'ms', 's '];
+const byteUnits = ['B ', 'kB', 'MB', 'GB'];
 
 const maxDecimalWidth = decimalFormat.format(MAX_VALUE).length;
 const maxRmeWidth = rmeFormat.format(MAX_RME).length;
@@ -247,6 +265,7 @@ const maxRmeWidth = rmeFormat.format(MAX_RME).length;
  */
 export function createFormatter(options: FormatterOptions = {}): Formatter {
   const {
+    durationUnit = 'hertz',
     applyStyle = (_textRole, text) => text,
     padding = '  ',
     columnSeparator = ' │ ',
@@ -255,9 +274,11 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     errorSymbol = '✗',
     progressSymbols = ['○', '◔', '◑', '◕', '●'],
     testColumnName = 'Test',
-    durationColumnName = 'Speed',
+    durationColumnName = durationUnit === 'hertz' ? 'Speed' : 'Duration',
     memoryColumnName = 'Memory',
   } = options;
+
+  const durationUnits = durationUnit === 'hertz' ? hertzDurationUnits : secondDurationUnits;
 
   const symbolWidth = [successSymbol, errorSymbol, warmupSymbol, ...progressSymbols].reduce(
     (width, symbol) => Math.max(width, symbol.length),
@@ -269,9 +290,9 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
   // Status lines have no separators, but their parts are aligned with columns of results
   const blankColumnSeparator = ' '.repeat(columnSeparator.length);
 
-  const durationColumnWidth = Math.max(durationColumnName.length, getSummaryWidth(DURATION_UNIT));
+  const durationColumnWidth = Math.max(durationColumnName.length, getSummaryWidth(durationUnits));
 
-  const durationColumnPadding = ' '.repeat(durationColumnWidth - getSummaryWidth(DURATION_UNIT));
+  const durationColumnPadding = ' '.repeat(durationColumnWidth - getSummaryWidth(durationUnits));
 
   const emptyColumns = styledColumnSeparator + ' '.repeat(durationColumnWidth) + styledColumnSeparator;
 
@@ -279,22 +300,17 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     return padding.length * depth + symbolWidth + 1;
   }
 
-  function formatMeasurement(value: number, unit: string): string {
-    let unitLabel = ' ' + unit + ' ';
+  /**
+   * @param value The value in the smallest unit.
+   * @param units Units from the smallest to the largest.
+   */
+  function formatMeasurement(value: number, units: readonly string[]): string {
+    let unitIndex = 0;
 
-    if (value > MAX_VALUE) {
+    // A value that would round to 1000.00 is shown in the next unit
+    while (value > MAX_VALUE && unitIndex < units.length - 1) {
       value /= 1_000;
-      unitLabel = ' k' + unit;
-    }
-
-    if (value > MAX_VALUE) {
-      value /= 1_000;
-      unitLabel = ' M' + unit;
-    }
-
-    if (value > MAX_VALUE) {
-      value /= 1_000;
-      unitLabel = ' G' + unit;
+      unitIndex++;
     }
 
     const valueLabel = decimalFormat.format(value).padStart(maxDecimalWidth);
@@ -302,7 +318,8 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     return (
       applyStyle('number_integer', valueLabel.slice(0, -3)) +
       applyStyle('number_fraction', valueLabel.slice(-3)) +
-      unitLabel
+      ' ' +
+      units[unitIndex]
     );
   }
 
@@ -317,14 +334,14 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     return applyStyle('rme', ' ± ' + rmeLabel.padStart(maxRmeWidth));
   }
 
-  function formatSummary(summary: HistogramSummary, value: number, unit: string): string {
+  function formatSummary(summary: HistogramSummary, value: number, units: readonly string[]): string {
     if (summary.size !== 0) {
-      return formatMeasurement(value, unit) + formatRme(summary.rme);
+      return formatMeasurement(value, units) + formatRme(summary.rme);
     }
 
     return applyStyle(
       'not_available',
-      'n/a'.padStart(maxDecimalWidth) + ' '.repeat(getSummaryWidth(unit) - maxDecimalWidth)
+      'n/a'.padStart(maxDecimalWidth) + ' '.repeat(getSummaryWidth(units) - maxDecimalWidth)
     );
   }
 
@@ -417,18 +434,18 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     formatTestEnd(params) {
       const { isFailed, durationSummary, memorySummary } = params;
 
-      // Durations are in milliseconds
-      const hz = 1_000 / durationSummary.mean;
+      // Durations are in milliseconds, and are shown either in hertz, or in nanoseconds which are scaled to larger units
+      const durationValue = durationUnit === 'hertz' ? 1_000 / durationSummary.mean : durationSummary.mean * 1_000_000;
 
       return (
         (isFailed
           ? formatTestColumn(params, 'error_symbol', errorSymbol)
           : formatTestColumn(params, 'success_symbol', successSymbol)) +
         styledColumnSeparator +
-        formatSummary(durationSummary, hz, DURATION_UNIT) +
+        formatSummary(durationSummary, durationValue, durationUnits) +
         durationColumnPadding +
         styledColumnSeparator +
-        formatSummary(memorySummary, memorySummary.mean, MEMORY_UNIT)
+        formatSummary(memorySummary, memorySummary.mean, byteUnits)
       );
     },
 
@@ -440,8 +457,9 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
 
 /**
  * Returns the width of a value with its unit and margin of error.
+ *
+ * @param units Units that are padded to the same width.
  */
-function getSummaryWidth(unit: string): number {
-  // A unit label is a space, a prefix and the unit, or the unit with a space on each side
-  return maxDecimalWidth + ' k'.length + unit.length + ' ± '.length + maxRmeWidth;
+function getSummaryWidth(units: readonly string[]): number {
+  return maxDecimalWidth + ' '.length + units[0].length + ' ± '.length + maxRmeWidth;
 }

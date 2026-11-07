@@ -4,6 +4,7 @@ import { parseArgs } from 'util';
 import type { TestOptions } from '../index.ts';
 import { resolveTestOptions } from '../runner.ts';
 import { assert, getErrorMessage, globToRegExp, isArrayOf, isObject, isString } from '../utils.ts';
+import type { DurationUnit } from './createFormatter.ts';
 
 const CONFIG_FILE = 'toofast.json';
 
@@ -38,6 +39,11 @@ export interface Config {
    * Test options from the config file, with defaults for options that aren't set.
    */
   testOptions: Required<TestOptions>;
+
+  /**
+   * The unit of durations in results.
+   */
+  durationUnit: DurationUnit;
 }
 
 /**
@@ -47,12 +53,14 @@ interface UserConfig {
   setupFilePatterns?: string[];
   testFilePatterns?: string[];
   testOptions?: TestOptions;
+  durationUnit?: DurationUnit;
 }
 
 const defaultConfig: Required<UserConfig> = {
   setupFilePatterns: [],
   testFilePatterns: TEST_FILE_PATTERNS,
   testOptions: {},
+  durationUnit: 'hertz',
 };
 
 /**
@@ -83,6 +91,7 @@ export function resolveConfig(args = process.argv.slice(2), cwd = process.cwd())
     testFiles: globFiles(userConfig.testFilePatterns, configDir, EXCLUDE_PATTERNS),
     testNamePatterns: positionals.map(globToRegExp),
     testOptions: resolveTestOptions(userConfig.testOptions),
+    durationUnit: userConfig.durationUnit,
   };
 }
 
@@ -104,6 +113,7 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
     setupFilePatterns = [],
     testFilePatterns = TEST_FILE_PATTERNS,
     testOptions = {},
+    durationUnit = 'hertz',
     ...unknownOptions
   } = config;
 
@@ -117,10 +127,13 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   assert(isObject(testOptions), 'testOptions must be an object');
 
+  assert(durationUnit === 'hertz' || durationUnit === 'second', 'durationUnit must be "hertz" or "second"');
+
   return {
     setupFilePatterns,
     testFilePatterns,
     testOptions,
+    durationUnit,
   };
 }
 

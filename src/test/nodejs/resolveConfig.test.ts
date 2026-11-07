@@ -131,6 +131,14 @@ describe('resolveConfig', () => {
     expect(() => resolveConfig([], dir)).toThrow('Unknown test option: aaa');
   });
 
+  test('throws if a config file has an unknown duration unit', () => {
+    const dir = makeTestDir({
+      'toofast.json': JSON.stringify({ durationUnit: 'aaa' }),
+    });
+
+    expect(() => resolveConfig([], dir)).toThrow('durationUnit must be "hertz" or "second"');
+  });
+
   test('throws if an argument is unknown', () => {
     const dir = makeTestDir({});
 
