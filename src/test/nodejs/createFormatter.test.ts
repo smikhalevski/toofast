@@ -16,6 +16,7 @@ describe('createFormatter', () => {
   const summaries = {
     durationSummary: { size: 5, mean: 0.25, rme: 0.0229 },
     memorySummary: { size: 10, mean: 222, rme: 0 },
+    durationPercentiles: [0.25, 0.5],
   };
 
   test('styles text by its role', () => {
@@ -41,6 +42,7 @@ describe('createFormatter', () => {
       testColumnWidth: 8,
       durationSummary: emptyHistogramSummary,
       memorySummary: emptyHistogramSummary,
+      durationPercentiles: [],
     };
 
     expect(customFormatter.formatHeader(8)).toBe('ggg     jjjhhh                jjjiii');
@@ -141,6 +143,7 @@ describe('createFormatter', () => {
         ...params,
         durationSummary: { size: 2, mean: 0.25, rme: 0.99994 },
         memorySummary: { size: 2, mean: 999.99, rme: 0.1629 },
+        durationPercentiles: [],
       })
     ).toBe('✓ aaa │   4.00 kHz ± 99.99% │ 999.99 B  ± 16.29%');
   });
@@ -159,6 +162,7 @@ describe('createFormatter', () => {
       isFailed: false,
       durationSummary: { size: 2, mean: 0.25, rme: 0.99995 },
       memorySummary: { size: 2, mean: 222, rme: 111 },
+      durationPercentiles: [],
     };
 
     expect(formatter.formatTestEnd(params)).toBe('✓ aaa │   4.00 kHz ±  ≥100% │ 222.00 B  ±  ≥100%');
@@ -174,6 +178,7 @@ describe('createFormatter', () => {
         isFailed: false,
         durationSummary: { size: 2, mean: 0.25, rme: 0 },
         memorySummary: { size: 2, mean: 999.996, rme: 0 },
+        durationPercentiles: [],
       })
     ).toBe('✓ aaa │   4.00 kHz ±  0.00% │   1.00 kB ±  0.00%');
   });
@@ -194,21 +199,41 @@ describe('createFormatter', () => {
         isFailed: false,
         durationSummary: { size: 2, mean: 999.9996, rme: 0 },
         memorySummary: { size: 2, mean: 222, rme: 0 },
+        durationPercentiles: [],
       })
     ).toBe('✓ aaa │   1.00 s  ±  0.00% │ 222.00 B  ±  0.00%');
   });
 
+  test('adds a column for each percentile', () => {
+    const percentileFormatter = createFormatter({ percentiles: [50, 99.9] });
+
+    expect(percentileFormatter.formatHeader(5)).toBe('Test  │ Speed               │ p50        │ p99.9      │ Memory');
+    expect(percentileFormatter.formatEmptyLine(5)).toBe('      │                     │            │            │ ');
+  });
+
+  test('formats percentiles of durations in the duration unit', () => {
+    const params = { depth: 0, testName: 'aaa', testColumnWidth: 5, isFailed: false, ...summaries };
+
+    expect(createFormatter({ percentiles: [50, 99] }).formatTestEnd(params)).toBe(
+      '✓ aaa │   4.00 kHz ±  2.29% │   4.00 kHz │   2.00 kHz │ 222.00 B  ±  0.00%'
+    );
+    expect(createFormatter({ durationUnit: 'second', percentiles: [50, 99] }).formatTestEnd(params)).toBe(
+      '✓ aaa │ 250.00 µs ±  2.29% │ 250.00 µs │ 500.00 µs │ 222.00 B  ±  0.00%'
+    );
+  });
+
   test('formats unknown values and margins of error as n/a', () => {
     expect(
-      formatter.formatTestEnd({
+      createFormatter({ percentiles: [50] }).formatTestEnd({
         depth: 0,
         testName: 'aaa',
         testColumnWidth: 5,
         isFailed: true,
         durationSummary: { size: 1, mean: 0.25, rme: NaN },
         memorySummary: emptyHistogramSummary,
+        durationPercentiles: [NaN],
       })
-    ).toBe('✗ aaa │   4.00 kHz ±    n/a │    n/a            ');
+    ).toBe('✗ aaa │   4.00 kHz ±    n/a │    n/a     │    n/a            ');
   });
 
   test('shows the index of a measure only if a test has several measures', () => {

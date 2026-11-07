@@ -31,6 +31,13 @@ export function isNonNegativeInteger(value: unknown): value is number {
 }
 
 /**
+ * Returns `true` if the value is a number between `0` and `100`, inclusive.
+ */
+export function isPercentile(value: unknown): value is number {
+  return typeof value === 'number' && value >= 0 && value <= 100;
+}
+
+/**
  * Returns `true` if the value is an object, but not an array.
  */
 export function isObject(value: unknown): value is Record<string, unknown> {

@@ -69,7 +69,7 @@ export interface RunTestFilesParams {
  */
 export async function runTestFiles(params: RunTestFilesParams): Promise<void> {
   const { config, reporter } = params;
-  const { setupFiles, testOptions } = config;
+  const { setupFiles, testOptions, percentiles } = config;
 
   const testModules = await collectTestModules(config);
   const testBlocks: TestBlock[] = [];
@@ -93,6 +93,7 @@ export async function runTestFiles(params: RunTestFilesParams): Promise<void> {
       setupFiles,
       testFile: testModule.testFile,
       testOptions,
+      percentiles,
       reporter,
     });
 
@@ -147,6 +148,7 @@ interface RunBlocksParams {
   setupFiles: string[];
   testFile: string;
   testOptions: TestOptions;
+  percentiles: number[];
   reporter: Reporter;
 }
 
@@ -156,7 +158,7 @@ interface RunBlocksParams {
  * Returns the number of errors thrown by tests and describe blocks.
  */
 async function runBlocks(blocks: readonly Block[], params: RunBlocksParams): Promise<number> {
-  const { setupFiles, testFile, testOptions, reporter } = params;
+  const { setupFiles, testFile, testOptions, percentiles, reporter } = params;
 
   let errorCount = 0;
 
@@ -181,7 +183,12 @@ async function runBlocks(blocks: readonly Block[], params: RunBlocksParams): Pro
     let durationSummary = emptyHistogramSummary;
     let memorySummary = emptyHistogramSummary;
 
-    await runJobInWorker({ type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path }, event => {
+    // Percentiles are unknown if the worker exits before the test ends
+    let durationPercentiles = percentiles.map(() => NaN);
+
+    const job: WorkerJob = { type: 'run_test', setupFiles, testFile, testOptions, testPath: block.path, percentiles };
+
+    await runJobInWorker(job, event => {
       switch (event.type) {
         case 'warmup_started':
           reporter.onWarmupStart({
@@ -208,6 +215,7 @@ async function runBlocks(blocks: readonly Block[], params: RunBlocksParams): Pro
         case 'test_ended':
           durationSummary = event.durationSummary;
           memorySummary = event.memorySummary;
+          durationPercentiles = event.durationPercentiles;
           break;
       }
     });
@@ -218,6 +226,7 @@ async function runBlocks(blocks: readonly Block[], params: RunBlocksParams): Pro
       block,
       durationSummary,
       memorySummary,
+      durationPercentiles,
       errorMessages,
     });
   }

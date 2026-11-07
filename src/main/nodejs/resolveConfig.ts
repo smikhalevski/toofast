@@ -3,7 +3,7 @@ import path from 'path';
 import { parseArgs } from 'util';
 import type { TestOptions } from '../index.ts';
 import { resolveTestOptions } from '../runner.ts';
-import { assert, getErrorMessage, globToRegExp, isArrayOf, isObject, isString } from '../utils.ts';
+import { assert, getErrorMessage, globToRegExp, isArrayOf, isObject, isPercentile, isString } from '../utils.ts';
 import type { DurationUnit } from './createFormatter.ts';
 
 const CONFIG_FILE = 'toofast.json';
@@ -44,6 +44,11 @@ export interface Config {
    * The unit of durations in results.
    */
   durationUnit: DurationUnit;
+
+  /**
+   * Percentiles of call durations to show in results, between 0 and 100.
+   */
+  percentiles: number[];
 }
 
 /**
@@ -54,6 +59,7 @@ interface UserConfig {
   testFilePatterns?: string[];
   testOptions?: TestOptions;
   durationUnit?: DurationUnit;
+  percentiles?: number[];
 }
 
 const defaultConfig: Required<UserConfig> = {
@@ -61,6 +67,7 @@ const defaultConfig: Required<UserConfig> = {
   testFilePatterns: TEST_FILE_PATTERNS,
   testOptions: {},
   durationUnit: 'hertz',
+  percentiles: [],
 };
 
 /**
@@ -92,6 +99,7 @@ export function resolveConfig(args = process.argv.slice(2), cwd = process.cwd())
     testNamePatterns: positionals.map(globToRegExp),
     testOptions: resolveTestOptions(userConfig.testOptions),
     durationUnit: userConfig.durationUnit,
+    percentiles: userConfig.percentiles,
   };
 }
 
@@ -114,6 +122,7 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
     testFilePatterns = TEST_FILE_PATTERNS,
     testOptions = {},
     durationUnit = 'hertz',
+    percentiles = [],
     ...unknownOptions
   } = config;
 
@@ -129,11 +138,14 @@ function readConfigFile(configFile: string, configPath: string): Required<UserCo
 
   assert(durationUnit === 'hertz' || durationUnit === 'second', 'durationUnit must be "hertz" or "second"');
 
+  assert(isArrayOf(percentiles, isPercentile), 'percentiles must be an array of numbers between 0 and 100');
+
   return {
     setupFilePatterns,
     testFilePatterns,
     testOptions,
     durationUnit,
+    percentiles,
   };
 }
 

@@ -90,6 +90,11 @@ export interface FormatTestEndParams extends FormatTestStartParams {
   isFailed: boolean;
   durationSummary: HistogramSummary;
   memorySummary: HistogramSummary;
+
+  /**
+   * Values of {@link FormatterOptions.percentiles} in milliseconds, in the same order. A value is `NaN` if it's unknown.
+   */
+  durationPercentiles: readonly number[];
 }
 
 /**
@@ -160,6 +165,14 @@ export interface FormatterOptions {
    * @default 'hertz'
    */
   durationUnit?: DurationUnit;
+
+  /**
+   * Percentiles of durations to show, between `0` and `100`. Each percentile has its own column, which shows the value
+   * in {@link durationUnit}.
+   *
+   * @default []
+   */
+  percentiles?: readonly number[];
 
   /**
    * Styles a piece of text by its role, for example, colors it. By default, text isn't styled.
@@ -266,6 +279,7 @@ const maxRmeWidth = rmeFormat.format(MAX_RME).length;
 export function createFormatter(options: FormatterOptions = {}): Formatter {
   const {
     durationUnit = 'hertz',
+    percentiles = [],
     applyStyle = (_textRole, text) => text,
     padding = '  ',
     columnSeparator = ' │ ',
@@ -294,7 +308,25 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
 
   const durationColumnPadding = ' '.repeat(durationColumnWidth - getSummaryWidth(durationUnits));
 
-  const emptyColumns = styledColumnSeparator + ' '.repeat(durationColumnWidth) + styledColumnSeparator;
+  // A percentile has no margin of error, so it's narrower than the mean
+  const percentileValueWidth = maxDecimalWidth + ' '.length + durationUnits[0].length;
+
+  let percentileHeader = '';
+  let percentileEmptyColumns = '';
+
+  const percentileColumnPaddings: string[] = [];
+
+  for (const percentile of percentiles) {
+    const columnName = 'p' + percentile;
+    const columnWidth = Math.max(columnName.length, percentileValueWidth);
+
+    percentileHeader += styledColumnSeparator + applyStyle('column_name', columnName.padEnd(columnWidth));
+    percentileEmptyColumns += styledColumnSeparator + ' '.repeat(columnWidth);
+    percentileColumnPaddings.push(' '.repeat(columnWidth - percentileValueWidth));
+  }
+
+  const emptyColumns =
+    styledColumnSeparator + ' '.repeat(durationColumnWidth) + percentileEmptyColumns + styledColumnSeparator;
 
   function getTestNameStart(depth: number): number {
     return padding.length * depth + symbolWidth + 1;
@@ -339,10 +371,29 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
       return formatMeasurement(value, units) + formatRme(summary.rme);
     }
 
-    return applyStyle(
-      'not_available',
-      'n/a'.padStart(maxDecimalWidth) + ' '.repeat(getSummaryWidth(units) - maxDecimalWidth)
-    );
+    return formatNotAvailable(getSummaryWidth(units));
+  }
+
+  /**
+   * @param duration The percentile of durations in milliseconds, or `NaN` if it's unknown.
+   */
+  function formatPercentile(duration: number): string {
+    if (Number.isNaN(duration)) {
+      return formatNotAvailable(percentileValueWidth);
+    }
+
+    return formatMeasurement(toDurationValue(duration), durationUnits);
+  }
+
+  function formatNotAvailable(width: number): string {
+    return applyStyle('not_available', 'n/a'.padStart(maxDecimalWidth).padEnd(width));
+  }
+
+  /**
+   * Converts a duration in milliseconds to hertz, or to nanoseconds, which are scaled to larger units when formatted.
+   */
+  function toDurationValue(duration: number): number {
+    return durationUnit === 'hertz' ? 1_000 / duration : duration * 1_000_000;
   }
 
   function formatMeasureIndex(measureIndex: number, measureCount: number): string {
@@ -384,6 +435,7 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
         applyStyle('column_name', testColumnName.padEnd(testColumnWidth)) +
         styledColumnSeparator +
         applyStyle('column_name', durationColumnName.padEnd(durationColumnWidth)) +
+        percentileHeader +
         styledColumnSeparator +
         applyStyle('column_name', memoryColumnName)
       );
@@ -432,21 +484,21 @@ export function createFormatter(options: FormatterOptions = {}): Formatter {
     },
 
     formatTestEnd(params) {
-      const { isFailed, durationSummary, memorySummary } = params;
+      const { isFailed, durationSummary, memorySummary, durationPercentiles } = params;
 
-      // Durations are in milliseconds, and are shown either in hertz, or in nanoseconds which are scaled to larger units
-      const durationValue = durationUnit === 'hertz' ? 1_000 / durationSummary.mean : durationSummary.mean * 1_000_000;
-
-      return (
+      let line =
         (isFailed
           ? formatTestColumn(params, 'error_symbol', errorSymbol)
           : formatTestColumn(params, 'success_symbol', successSymbol)) +
         styledColumnSeparator +
-        formatSummary(durationSummary, durationValue, durationUnits) +
-        durationColumnPadding +
-        styledColumnSeparator +
-        formatSummary(memorySummary, memorySummary.mean, byteUnits)
-      );
+        formatSummary(durationSummary, toDurationValue(durationSummary.mean), durationUnits) +
+        durationColumnPadding;
+
+      for (let i = 0; i < percentiles.length; ++i) {
+        line += styledColumnSeparator + formatPercentile(durationPercentiles[i]) + percentileColumnPaddings[i];
+      }
+
+      return line + styledColumnSeparator + formatSummary(memorySummary, memorySummary.mean, byteUnits);
     },
 
     formatError(errorMessage) {

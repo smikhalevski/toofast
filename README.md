@@ -319,6 +319,19 @@ The unit of durations in results: `"hertz"` shows how many times per second a fu
 Defaults to `"hertz"`.
 
 </dd>
+<dt><a name="config-percentiles"></a><code>percentiles</code></dt>
+<dd>
+
+The array of percentiles of call durations to show in results, between 0 and 100. Each percentile is shown in a separate
+column in [`durationUnit`](#config-durationunit): with `"hertz"`, the p-th percentile is the speed that p% of loops
+reach or beat, and with `"second"`, it's the time that p% of loops stay under.
+
+Percentiles describe mean call durations of [timed loops](#how-measurement-works), so a loop of many calls evens out how
+much single calls vary. If a test has several measures, a percentile is the mean of percentiles of measures.
+
+Defaults to `[]`.
+
+</dd>
 </dl>
 
 ## Test options
@@ -498,6 +511,9 @@ Then the measure runs batches with a [pause](#config-batchpauseduration) after e
 
 - Each batch adds its mean call duration to the results. The margin of error comes from how much batches differ, so it
   reflects noise such as changes of CPU frequency and garbage collection.
+
+- Each timed loop adds its mean call duration to [percentiles](#config-percentiles). A measure keeps up to 10 000 loops,
+  and if it times more, percentiles are estimated from a random sample of them.
 
 The measure stops when the margin of error of batches reaches [`targetRme`](#config-targetrme), but not before
 [`minBatchCount`](#config-minbatchcount) batches, or when [`measureTimeout`](#config-measuretimeout) is reached.
